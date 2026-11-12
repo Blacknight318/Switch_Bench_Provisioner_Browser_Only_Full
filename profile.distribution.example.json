@@ -1,0 +1,174 @@
+{
+  "profile_name": "c9200cx-distribution-example",
+  "supported_models": ["C9200CX-8P-2X2G"],
+  "base_commands": [
+    "service timestamps debug datetime msec",
+    "service timestamps log datetime localtime",
+    "service password-encryption",
+    "no ip gratuitous-arps",
+    "no ip domain lookup",
+    "ip domain name ${DOMAIN_NAME}",
+    "ip ssh version 2",
+    "login block-for 900 attempts 3 within 120",
+    "login quiet-mode access-class MANAGEMENT_NET",
+    "login on-failure log",
+    "login on-success log",
+    "udld enable",
+    "spanning-tree mode rapid-pvst",
+    "spanning-tree loopguard default",
+    "spanning-tree extend system-id",
+    "errdisable recovery interval 3000",
+    "vtp mode transparent",
+    "no ip http server",
+    "no ip http secure-server",
+    "ip ssh time-out 60",
+    "ip ssh authentication-retries 3",
+    "ip ssh server algorithm kex ecdh-sha2-nistp256 diffie-hellman-group16-sha512",
+    "ip ssh server algorithm encryption aes256-ctr aes256-gcm",
+    "ip ssh server algorithm mac hmac-sha2-256 hmac-sha2-512",
+    "aaa local authentication attempts max-fail 5",
+    "no ip source-route"
+  ],
+  "vlans": [
+    {"id": "${MGMT_VLAN}", "name": "MANAGEMENT"},
+    {"id": "${ACCESS_VLAN_1}", "name": "ACCESS-1"},
+    {"id": "${ACCESS_VLAN_2}", "name": "ACCESS-2"},
+    {"id": "${NATIVE_VLAN}", "name": "NATIVE-BLACKHOLE"}
+  ],
+  "management": {
+    "enabled": true,
+    "vlan": "${MGMT_VLAN}",
+    "ip": "${MGMT_IP}",
+    "mask": "${MGMT_MASK}",
+    "gateway": "${MGMT_GATEWAY}"
+  },
+  "acls": [
+    {
+      "name": "MANAGEMENT_NET",
+      "entries": [],
+      "source_host_lists": [
+        {
+          "env": "MGMT_SSH_SOURCES",
+          "protocol": "tcp",
+          "destination": "${MGMT_IP}",
+          "port": 22,
+          "sequence_start": 10,
+          "sequence_step": 10
+        }
+      ]
+    },
+    {
+      "name": "snmp-service",
+      "type": "standard",
+      "entries": ["10 permit host ${SNMP_MANAGER_HOST}"]
+    },
+    {
+      "name": "NTP-ACL",
+      "type": "standard",
+      "entries": ["10 permit host ${NTP_SERVER_1}"]
+    }
+  ],
+  "logging": {
+    "commands": [
+      "logging userinfo",
+      "logging buffered 16384 informational",
+      "logging origin-id hostname",
+      "logging source-interface Vlan${MGMT_VLAN}",
+      "logging host ${SYSLOG_SERVER_1} transport tcp port ${SYSLOG_PORT}",
+      "logging trap errors"
+    ]
+  },
+  "ntp_servers": ["${NTP_SERVER_1}"],
+  "ntp_access": {"peer_acl": "NTP-ACL"},
+  "aaa": {
+    "enabled": true,
+    "group_name": "RAD_SERVERS",
+    "enable_secret_env": "ENABLE_SECRET",
+    "local_username_env": "LOCAL_ADMIN_USERNAME",
+    "local_secret_env": "LOCAL_ADMIN_SECRET",
+    "radius_source_interface": "Vlan${MGMT_VLAN}",
+    "radius_servers": [
+      {
+        "name": "${RADIUS_SERVER_1_NAME}",
+        "address": "${RADIUS_SERVER_1_HOST}",
+        "auth_port": 1812,
+        "acct_port": 1813,
+        "timeout": 60,
+        "secret_env": "RADIUS_SERVER_1_SECRET"
+      },
+      {
+        "name": "${RADIUS_SERVER_2_NAME}",
+        "address": "${RADIUS_SERVER_2_HOST}",
+        "auth_port": 1812,
+        "acct_port": 1813,
+        "timeout": 60,
+        "secret_env": "RADIUS_SERVER_2_SECRET"
+      }
+    ],
+    "commands": [
+      "aaa authentication login LOGIN_AUTH group RAD_SERVERS local",
+      "aaa authentication login CONSOLE local",
+      "aaa authorization exec default group RAD_SERVERS local",
+      "aaa session-id common",
+      "line con 0",
+      " exec-timeout 5 0",
+      " logging synchronous",
+      " login authentication CONSOLE",
+      " stopbits 1",
+      "line vty 0 1",
+      " access-class MANAGEMENT_NET in",
+      " exec-timeout 5 0",
+      " logging synchronous",
+      " login authentication LOGIN_AUTH",
+      " transport input ssh",
+      "line vty 2 15",
+      " access-class MANAGEMENT_NET in",
+      " transport input none",
+      " exec-timeout 5 0"
+    ]
+  },
+  "archive_logging": {"enabled": true, "size": 1000, "hidekeys": true, "notify_syslog": true},
+  "diagnostics": {"bootup_level": "minimal"},
+  "password_policy": {
+    "enabled": true,
+    "name": "PASSWORD_POLICY",
+    "min_length": 16,
+    "max_length": 127,
+    "numeric_count": 1,
+    "upper_case": 1,
+    "lower_case": 1,
+    "special_case": 1,
+    "char_changes": 8,
+    "remove_legacy_enable_password": true
+  },
+  "snmp": {
+    "enabled": true,
+    "group": "snmpv3-rw",
+    "readonly_group": "snmpv3-ro",
+    "view": "SNMP-RO-VIEW",
+    "access_list": "snmp-service",
+    "location": "${SNMP_LOCATION}",
+    "host": "${SNMP_MANAGER_HOST}",
+    "username_env": "SNMPV3_USERNAME",
+    "auth_protocol": "sha",
+    "auth_password_env": "SNMPV3_AUTH_PASSWORD",
+    "priv_protocol": "aes 128",
+    "priv_password_env": "SNMPV3_PRIV_PASSWORD",
+    "trap_commands": [
+      "snmp-server enable traps snmp authentication linkdown linkup coldstart warmstart",
+      "snmp-server enable traps power-ethernet group 1 threshold 80",
+      "snmp-server enable traps power-ethernet police",
+      "snmp-server enable traps envmon fan shutdown supply temperature status",
+      "snmp-server enable traps errdisable",
+      "snmp ifmib ifindex persist"
+    ]
+  },
+  "l2_access_policy": {
+    "port_security": {"enabled": true, "maximum": 2, "violation": "restrict", "sticky": true},
+    "storm_control": {"enabled": true, "broadcast_level": "1.00", "multicast_level": "1.00", "action": "trap"},
+    "dhcp_snooping": {"enabled": false, "reason": "network uses static addressing"},
+    "dai": {"enabled": false, "reason": "requires DHCP Snooping bindings; network uses static addressing"}
+  },
+  "qos": {"enabled": false, "class_maps": [], "policy_maps": [], "attachments": [], "system_cpp_apply": false},
+  "banners": {"login": "Authorized access only. Activity may be monitored and recorded."}
+}

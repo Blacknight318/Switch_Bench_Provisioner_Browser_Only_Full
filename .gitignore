@@ -1,0 +1,74 @@
+# Secrets and local environment files
+.env
+.env.*
+!.env.example
+*.secret
+*.secrets
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+id_rsa
+id_ed25519
+credentials.json
+service-account*.json
+profile.json
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node / web tooling
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/
+.vite/
+.next/
+
+# Build and temporary artifacts
+dist/
+build/
+coverage/
+tmp/
+temp/
+.cache/
+*.tmp
+*.bak
+*.swp
+*~
+
+# Logs
+*.log
+logs/
+
+# Evaluate-STIG generated scan output
+*.cklb
+CombinedCKLB*
+SummaryReport*.xml
+XCCDF*.xml
+STIG_Compliance/
+scan-output/
+
+# Generated packages and downloaded artifacts
+*.zip
+*.7z
+*.tar
+*.tar.gz
+
+# Operating system / editor metadata
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.code-workspace
