@@ -1,0 +1,601 @@
+diff --git a/README.md b/README.md
+index ed54916..e5f765c 100644
+--- a/README.md
++++ b/README.md
+@@ -1,7 +1,10 @@
+ # Switch Bench Provisioner — browser-only edition
+ 
+ ## Contents
+-- `index.html` — the complete application.
++- `index.html` — main application markup and Content Security Policy.
++- `styles.css` — local application and FAQ styling.
++- `app.js` — local browser-only application logic.
++- `faq.html` — safe-use guidance and links to the sanitized example files.
+ - `profile.json` — site-specific non-secret working profile; do not distribute it unchanged.
+ - `profile.distribution.example.json` — sanitized distribution profile. Site names, addresses, infrastructure endpoints, and account names use `${VARIABLE}` placeholders resolved from the imported encrypted key file.
+ - `.env.example` — complete example key-file format. It contains placeholder site values and no usable secrets.
+diff --git a/index.html b/index.html
+index 770b6b8..a84abf4 100644
+--- a/index.html
++++ b/index.html
+@@ -4,11 +4,9 @@
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1">
+ <meta http-equiv="Content-Security-Policy"
+-  content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
++  content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+ <title>Switch Bench Provisioner</title>
+-<style>
+-:root{color-scheme:dark;--bg:#10151c;--panel:#18212c;--line:#344458;--text:#e8eef6;--muted:#a9b8ca;--blue:#48a6ff;--green:#55d39a;--amber:#ffbf52;--red:#ff7583}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,sans-serif}header{padding:20px max(20px,calc((100vw - 1450px)/2));border-bottom:1px solid var(--line);background:#121b26}h1{margin:0;font-size:1.55rem}h2{font-size:1.05rem;margin:0 0 12px}h3{font-size:.95rem;margin:14px 0 6px}.sub,.note{color:var(--muted)}main{max-width:1450px;margin:auto;padding:18px;display:grid;grid-template-columns:390px 1fr;gap:18px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:15px;margin-bottom:14px}.wide{grid-column:1/-1}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.triple{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}label{display:block;font-weight:650;margin:0 0 4px}input,select,textarea,button{font:inherit}input,select,textarea{width:100%;padding:8px;border-radius:6px;border:1px solid var(--line);background:#0e151e;color:var(--text)}textarea{min-height:130px;resize:vertical;font-family:ui-monospace,monospace;font-size:12px}button{padding:9px 11px;border:1px solid #3379b9;border-radius:6px;background:#1d71ad;color:white;cursor:pointer;font-weight:650}button.secondary{background:#263545;border-color:#506277}button.danger{background:#822b3a;border-color:#c84e61}button:disabled{opacity:.45;cursor:not-allowed}.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.warning{border-left:4px solid var(--amber);padding:9px 11px;background:#302719;color:#ffe0a5}.danger-note{border-left:4px solid var(--red);padding:9px 11px;background:#352026;color:#ffc5ca}.ok{color:var(--green)}.bad{color:var(--red)}.hidden{display:none!important}.ports{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:9px}.port{min-height:112px;text-align:left;background:#142334;border-color:#3d5873;padding:9px}.port.active{outline:3px solid var(--blue)}.port .name{font-weight:800;display:block}.port .meta{font-size:.82rem;color:#cbd7e5;display:block;margin-top:4px}.port.used{border-color:var(--amber);background:#342b1e}.port.trunk{border-color:#a67ae9;background:#29213a}.port.unassigned{opacity:.78}.legend{display:flex;gap:15px;flex-wrap:wrap;font-size:.86rem;color:var(--muted);margin:0 0 12px}.dot{display:inline-block;width:10px;height:10px;border-radius:99px;margin-right:4px}.console{min-height:120px;white-space:pre-wrap;background:#090d12;border:1px solid #334052;border-radius:6px;padding:10px;font:12px/1.4 ui-monospace,monospace;overflow:auto;max-height:280px}.check{display:flex;gap:8px;align-items:start;margin:8px 0}.check input{width:auto;margin-top:3px}.pill{display:inline-block;padding:2px 7px;border-radius:99px;background:#24374b;color:#cbe5ff;font-size:.8rem}details summary{cursor:pointer;font-weight:700}@media(max-width:900px){main{grid-template-columns:1fr}.wide{grid-column:auto}}@media(max-width:540px){.grid,.triple{grid-template-columns:1fr}}
+-</style>
++<link rel="stylesheet" href="styles.css">
+ </head>
+ <body>
+ <header><h1>Switch Bench Provisioner <span class="pill">Cisco Catalyst IOS / IOS-XE</span></h1><div class="sub">Local bench tool: inspect → plan → review → explicitly apply. No credentials are stored.</div></header>
+@@ -23,245 +21,15 @@
+   <div id="editor" class="hidden"><div class="triple"><div><label for="mode">Mode</label><select id="mode"><option value="access">Access</option><option value="trunk">Trunk</option><option value="unused">Unassigned / no config</option></select></div><div><label for="vlan">Access VLAN</label><input id="vlan" inputmode="numeric"></div><div><label for="adminState">Administrative state</label><select id="adminState"><option value="no shutdown">Enabled (no shutdown)</option><option value="shutdown">Disabled (shutdown)</option></select></div></div><label for="description">Description</label><input id="description" maxlength="120" placeholder="e.g., workstation / uplink"><div class="check"><input id="rootGuard" type="checkbox"><label for="rootGuard">Enable Root Guard (downstream trunks only)</label></div><div class="check"><input id="includeUsed" type="checkbox"><label for="includeUsed">Include this port even though discovery marks it in use</label></div><div class="actions"><button id="savePort">Save port</button><button id="resetPort" class="secondary">Restore default</button></div></div>
+  </div>
+  <div class="panel"><h2>3. Serial inspection</h2><p class="note">Use Chromium/Edge from <code>http://localhost</code>. Connect is user-initiated; the app runs read-only commands before any apply action.</p><div class="actions"><button id="connect">Connect serial</button><button id="inspect" class="secondary" disabled>Run read-only inspection</button><button id="disconnect" class="secondary" disabled>Disconnect</button></div><div id="serialStatus" class="note">Not connected.</div><label for="consoleInput">Console input</label><div class="grid"><input id="consoleInput" autocomplete="off" spellcheck="false" placeholder="For initial setup dialog, enter: no"><button id="sendConsole" class="secondary" disabled>Send + Enter</button></div><p class="note">Use this only for the connected bench switch. At the factory initial-configuration prompt, type <code>no</code> here and click <strong>Send + Enter</strong>; then wait for <code>Switch&gt;</code>.</p><label for="statusPaste">Or paste <code>show interfaces status</code> output</label><textarea id="statusPaste" placeholder="Paste IOS status output here, then parse it."></textarea><div class="actions"><button id="parseStatus" class="secondary">Parse pasted port usage</button><button id="parseCapturedStatus" class="secondary">Parse captured serial output</button></div></div>
+- <div class="panel"><h2>Firmware</h2><div class="warning">Firmware update is intentionally not enabled in this first build. IOS/IOS-XE image transfer, install mode, boot variables, and rollback must be verified per detected model and current release. Inspection captures model/version for that later workflow.</div></div>
++ <div class="panel"><h2>Resources</h2><p class="note">Firmware updates are intentionally outside this browser bench-provisioning tool. Image transfer, install mode, boot variables, storage, image integrity, and rollback require a separate model- and release-specific workflow.</p><p><a href="faq.html">FAQ and safe-use guide</a></p></div>
+ </section>
+ <section>
+- <div class="panel"><h2>Port map</h2><div class="legend"><span><i class="dot" style="background:#48a6ff"></i>access</span><span><i class="dot" style="background:#a67ae9"></i>trunk</span><span><i class="dot" style="background:#ffbf52"></i>discovered in use / protected</span></div><div id="ports" class="ports"></div></div>
++ <div class="panel"><h2>Port map</h2><div class="legend"><span><i class="dot dot-access"></i>access</span><span><i class="dot dot-trunk"></i>trunk</span><span><i class="dot dot-protected"></i>discovered in use / protected</span></div><div id="ports" class="ports"></div></div>
+  <div class="panel"><h2>Generated configuration</h2><div class="warning">Only selected port commands and an optional hostname are generated. The uploaded cheatsheet is reference material; site-specific management IPs, ACLs, RADIUS keys, SNMP, usernames, and generated platform control-plane/QoS definitions are deliberately excluded until separately templated and reviewed.</div><div class="actions"><button id="build">Build reviewed config</button><button id="download" class="secondary" disabled>Download .cfg</button></div><label for="config">Review before applying</label><textarea id="config" spellcheck="false" placeholder="Build configuration to preview it here."></textarea><div class="check"><input id="ack" type="checkbox"><label for="ack">I reviewed this configuration and confirm the connected switch is on the bench and at a privileged <code>#</code> prompt.</label></div><label for="applyWord">Type <code>APPLY</code> to enable serial application</label><input id="applyWord" autocomplete="off" placeholder="APPLY"><div class="actions"><button id="apply" class="danger" disabled>Apply preview over serial</button></div><p class="danger-note">Apply sends the preview line-by-line after <code>configure terminal</code>, then sends <code>end</code>. It does not execute <code>write memory</code>/<code>copy run start</code>. Save only after verifying the result.</p></div>
+- <div class="panel"><h2>Browser-only secure profile</h2><p class="note">Import the non-secret JSON profile and an .env-style key file. The key file is encrypted with AES-GCM in this tab only; nothing is saved to browser storage, exported, or sent to a server.</p><div class="grid"><div><label>Profile JSON <input id="profileFile" type="file" accept=".json"></label></div><div><label>Key file <input id="keyFile" type="file" accept=".env,.txt"></label></div></div><div class="grid"><div><label for="lockPass">Lock passphrase</label><input id="lockPass" type="password" autocomplete="new-password"></div><div><label for="secureModel">Detected switch model</label><input id="secureModel" value="C9200CX-8P-2X2G"></div></div><div class="actions"><button id="lockSecrets" class="secondary">Encrypt imported secrets in memory</button><button id="clearSecrets" class="secondary">Clear secrets</button><button id="renderSecure">Build redacted browser plan</button></div><div id="profileStatus" class="note">Import a profile and key file.</div><label for="securePreview">Redacted secure preview</label><textarea id="securePreview" spellcheck="false"></textarea><div class="check"><input id="secureAck" type="checkbox"><label for="secureAck">I reviewed the redacted plan and confirm the connected switch is the intended bench device.</label></div><div class="grid"><div><label for="unlockPass">Re-enter passphrase to apply</label><input id="unlockPass" type="password" autocomplete="current-password"></div><div><label for="secureApplyWord">Type APPLY</label><input id="secureApplyWord" autocomplete="off" placeholder="APPLY"></div></div><div class="actions"><button id="secureApply" class="danger" disabled>Apply secure plan over this browser serial connection</button></div></div>
++ <div class="panel"><h2>Browser-only secure profile</h2><p class="note">Import the non-secret JSON profile and an .env-style key file. The key file is encrypted with AES-GCM in this tab only; nothing is saved to browser storage, exported, or sent to a server.</p><div class="grid"><div><label>Profile JSON <input id="profileFile" type="file" accept=".json"></label><p class="note"><a href="https://github.com/Blacknight318/Switch_Bench_Provisioner_Browser_Only_Full/blob/main/profile.distribution.example.json" target="_blank" rel="noopener noreferrer">View the profile example on GitHub</a></p></div><div><label>Key file <input id="keyFile" type="file" accept=".env,.txt"></label><p class="note"><a href="https://github.com/Blacknight318/Switch_Bench_Provisioner_Browser_Only_Full/blob/main/.env.example" target="_blank" rel="noopener noreferrer">View the .env example on GitHub</a></p></div></div><div class="grid"><div><label for="lockPass">Lock passphrase</label><input id="lockPass" type="password" autocomplete="new-password"></div><div><label for="secureModel">Detected switch model</label><input id="secureModel" value="C9200CX-8P-2X2G"></div></div><div class="actions"><button id="lockSecrets" class="secondary">Encrypt imported secrets in memory</button><button id="clearSecrets" class="secondary">Clear secrets</button><button id="renderSecure">Build redacted browser plan</button></div><div id="profileStatus" class="note">Import a profile and key file.</div><label for="securePreview">Redacted secure preview</label><textarea id="securePreview" spellcheck="false"></textarea><div class="check"><input id="secureAck" type="checkbox"><label for="secureAck">I reviewed the redacted plan and confirm the connected switch is the intended bench device.</label></div><div class="grid"><div><label for="unlockPass">Re-enter passphrase to apply</label><input id="unlockPass" type="password" autocomplete="current-password"></div><div><label for="secureApplyWord">Type APPLY</label><input id="secureApplyWord" autocomplete="off" placeholder="APPLY"></div></div><div class="actions"><button id="secureApply" class="danger" disabled>Apply secure plan over this browser serial connection</button></div></div>
+  <div class="panel"><h2>Session log</h2><div id="log" class="console" aria-live="polite">Ready.</div></div>
+  <div class="panel"><details><summary>Cheatsheet review notes</summary><ul><li>The tool uses the port-mode patterns from the cheatsheet: access ports with <code>switchport nonegotiate</code>, BPDU Guard, and unicast blocking; trunks with native/allowed VLAN configuration and <code>switchport nonegotiate</code>.</li><li>The supplied reference has a concatenated line near its housekeeping section: <code>memory free low-watermark processor 20852logging host ...</code>. It is not applied.</li><li>Imported profiles can include management, ACL, AAA/RADIUS, SNMPv3, syslog, archive logging, and QoS definitions. Review every site-specific value and the redacted secure plan before applying.</li><li>SNMPv3 credentials are required in the imported key file when SNMP is enabled; the preview renders variable names only.</li></ul></details></div>
+ </section>
+ </main>
+-<script>
+-'use strict';
+-const $=id=>document.getElementById(id);
+-const log=(m,kind='')=>{
+-  const message=String(m);
+-  const el=$('log');
+-  el.textContent+=`\n[${new Date().toLocaleTimeString()}] ${message}`;
+-  el.scrollTop=el.scrollHeight;
+-  if(kind){
+-    const status=$('serialStatus');
+-    const badge=document.createElement('span');
+-    badge.className=kind;
+-    badge.textContent=message;
+-    status.replaceChildren(badge);
+-  }
+-};
+-let ports=[], selected=null, serialPort=null, writer=null, reader=null, readLoop=false, serialText='', serialClosing=false, suppressConsoleOutput=false;
+-const defaults=(count)=>{
+-  const a=[];
+-  for(let n=1;n<=count;n++){
+-    let vlan='',desc='OPEN';
+-    if(n<=4){vlan='100';desc='VLAN 100';}
+-    else if(n<=7){vlan='120';desc='VLAN 120';}
+-    else if(n===8){vlan='108';desc='VLAN 108';}
+-    a.push({name:`Gi1/0/${n}`,mode:vlan?'access':'unused',vlan,description:desc,admin:vlan?'no shutdown':'shutdown',used:false,includeUsed:false,rootGuard:false,default:true});
+-  }
+-  a.push({name:'Gi1/1/1',mode:'unused',vlan:'',description:'AUXILIARY UPLINK',admin:'shutdown',used:false,includeUsed:false,rootGuard:false,default:true});
+-  a.push({name:'Gi1/1/2',mode:'unused',vlan:'',description:'AUXILIARY UPLINK',admin:'shutdown',used:false,includeUsed:false,rootGuard:false,default:true});
+-  for(const n of [3,4])a.push({name:`Te1/1/${n}`,mode:'trunk',vlan:'',description:'TRUNK',admin:'no shutdown',used:false,includeUsed:false,rootGuard:false,default:true});
+-  return a;
+-};
+-function appendPortText(parent,className,text){
+-  const span=document.createElement('span');
+-  span.className=className;
+-  span.textContent=text;
+-  parent.append(span);
+-}
+-function render(){
+-  const box=$('ports');
+-  box.replaceChildren();
+-  ports.forEach((p,i)=>{
+-    const b=document.createElement('button');
+-    b.className='port';
+-    b.classList.toggle('trunk',p.mode==='trunk');
+-    b.classList.toggle('unassigned',p.mode==='unused');
+-    b.classList.toggle('used',p.used);
+-    b.classList.toggle('active',selected===i);
+-    appendPortText(b,'name',p.name);
+-    appendPortText(b,'meta',p.mode==='access'?`Access VLAN ${p.vlan||'—'}`:p.mode==='trunk'?'Trunk':'Unassigned');
+-    appendPortText(b,'meta',p.description||'');
+-    if(p.used)appendPortText(b,'meta bad','IN USE / protected');
+-    b.onclick=()=>select(i);
+-    box.append(b);
+-  });
+-  updateApply();
+-}
+-function select(i){
+-  selected=i;
+-  const p=ports[i];
+-  $('editor').classList.remove('hidden');
+-  $('selectedInfo').textContent=`Editing ${p.name}${p.used?' — discovered in use; excluded unless explicitly included.':''}`;
+-  $('mode').value=p.mode;
+-  $('vlan').value=p.vlan;
+-  $('adminState').value=p.admin||'no shutdown';
+-  $('description').value=p.description;
+-  $('includeUsed').checked=p.includeUsed;
+-  $('rootGuard').checked=!!p.rootGuard;
+-  render();
+-}
+-function validVlan(v){return /^([1-9]|[1-9]\d{1,3}|[1-3]\d{3}|40[0-8]\d|409[0-4])$/.test(v)&&+v<=4094}
+-$('savePort').onclick=()=>{if(selected===null)return;const p=ports[selected], mode=$('mode').value, vlan=$('vlan').value.trim(), admin=$('adminState').value, desc=$('description').value.trim();if(mode==='access'&&!validVlan(vlan)){alert('Enter an access VLAN from 1 through 4094.');return}p.mode=mode;p.vlan=mode==='access'?vlan:'';p.admin=(admin==='shutdown'?'shutdown':'no shutdown');p.description=desc;p.includeUsed=$('includeUsed').checked;p.rootGuard=$('rootGuard').checked;p.default=false;render()};
+-$('resetPort').onclick=()=>{if(selected===null)return;const fresh=defaults(+$('portCount').value).find(p=>p.name===ports[selected].name);fresh.used=ports[selected].used;ports[selected]=fresh;select(selected)};
+-$('portCount').onchange=()=>{ports=defaults(+$('portCount').value);selected=null;$('editor').classList.add('hidden');$('selectedInfo').textContent='Click a port to edit it.';render();log('Port profile reset to '+$('portCount').value+' access ports.','')};
+-function regexEscape(value){
+-  return String(value).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+-}
+-function parseUsage(text,source='pasted output'){
+-  if(!text.trim()){
+-    log(`Port-use parser skipped: no ${source} is available. Run read-only inspection, wait for output, then use Parse captured serial output or paste show interfaces status output.`,'bad');
+-    return;
+-  }
+-  let hits=0;
+-  for(const p of ports){
+-    const long=p.name.replace(/^Gi/,'GigabitEthernet').replace(/^Te/,'TenGigabitEthernet');
+-    const re=new RegExp(`(?:^|\\n)\\s*(?:${regexEscape(p.name)}|${regexEscape(long)})\\s+(.+)$`,'mi');
+-    const m=text.match(re);
+-    if(m){
+-      const state=m[1].toLowerCase();
+-      const inUse=/\bconnected\b/.test(state)&&!(/notconnect|disabled|err-disabled/.test(state));
+-      p.used=inUse;
+-      if(inUse)hits++;
+-    }
+-  }
+-  render();
+-  log(`Parsed ${source}: ${hits} currently connected port(s) marked protected.`);
+-}
+-$('parseStatus').onclick=()=>parseUsage($('statusPaste').value,'pasted status output');
+-$('parseCapturedStatus').onclick=()=>parseUsage(serialText,'captured serial output');
+-function cleanDesc(s){return s.replace(/[\r\n]/g,' ').replace(/[^\w .,:()\/-]/g,'').slice(0,120)}
+-function buildConfig(){const lines=[];const host=$('hostname').value.trim();if(host){if(!/^[A-Za-z0-9][A-Za-z0-9-]{0,62}$/.test(host))throw Error('Hostname may contain letters, digits, and hyphens only.');lines.push(`hostname ${host}`,'!')}const native=$('nativeVlan').value.trim(), allowed=$('allowedVlans').value.trim();if(!validVlan(native))throw Error('Trunk native VLAN must be 1 through 4094.');if(!/^\d+(,\d+)*$/.test(allowed)||allowed.split(',').some(v=>!validVlan(v)))throw Error('Allowed VLANs must be a comma-separated list of VLAN IDs.');let changed=0;for(const p of ports){if(p.mode==='unused'||(p.used&&!p.includeUsed))continue;lines.push(`interface ${p.name}`);if(p.description)lines.push(` description ${cleanDesc(p.description)}`);if(p.mode==='access'){lines.push(` switchport access vlan ${p.vlan}`,' switchport mode access',' switchport nonegotiate',' spanning-tree bpduguard enable',' switchport block unicast')}else{lines.push(` switchport trunk native vlan ${native}`,` switchport trunk allowed vlan ${allowed}`,' switchport mode trunk',' switchport nonegotiate');if(p.rootGuard)lines.push(' spanning-tree guard root')}lines.push(` ${p.admin==='shutdown'?'shutdown':'no shutdown'}`);lines.push('!');changed++}if(!changed&&!host)throw Error('Nothing is selected for configuration.');return lines.join('\n')+'\n'}
+-$('build').onclick=()=>{try{$('config').value=buildConfig();$('download').disabled=false;log('Configuration built. Review it before any serial application.')}catch(e){alert(e.message);log('Build blocked: '+e.message,'bad')}};
+-$('download').onclick=()=>{const body=$('config').value;if(!body)return;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([body],{type:'text/plain'}));a.download=($('hostname').value.trim()||'switch')+'-bench-config.cfg';a.click();URL.revokeObjectURL(a.href)};
+-function updateApply(){const ready=!!serialPort&&$('ack').checked&&$('applyWord').value==='APPLY'&&!!$('config').value;$('apply').disabled=!ready}$('ack').onchange=updateApply;$('applyWord').oninput=updateApply;$('config').oninput=updateApply;
+-async function readSerial(){const decoder=new TextDecoder();try{while(readLoop&&serialPort?.readable){reader=serialPort.readable.getReader();try{while(readLoop){const {value,done}=await reader.read();if(done)break;if(value){const t=decoder.decode(value);serialText+=t;if(!suppressConsoleOutput){$('log').textContent+=t;$('log').scrollTop=$('log').scrollHeight;}}}}finally{reader.releaseLock();reader=null}}}catch(e){log('Serial read error: '+e.message,'bad')}}
+-async function send(line){if(!writer)throw Error('Serial writer is unavailable.');await writer.write(new TextEncoder().encode(line+'\r'));await new Promise(r=>setTimeout(r,160));}
+-async function sendChecked(line, timeoutMs=5000, sensitive=false){const start=serialText.length;await send(line);const deadline=Date.now()+timeoutMs;while(Date.now()<deadline){const reply=serialText.slice(start);if(/% (?:Invalid input|Incomplete command|Ambiguous command|Error)/i.test(reply))throw Error(sensitive?'IOS rejected a protected command; inspect the switch locally.':'IOS rejected "'+line+'": '+reply.replace(/\s+/g,' ').slice(-260));if(/(?:^|[\r\n])[^\r\n]*[>#]\s*(?=[\r\n]|$)/.test(reply))return reply;await new Promise(r=>setTimeout(r,35));}throw Error(sensitive?'Timed out waiting for IOS after a protected command; inspect the switch locally.':`Timed out waiting for the IOS prompt after "${line}". Apply stopped; inspect the console before continuing.`);}
+-async function sendBannerChecked(item){await send(item.actual);for(const line of item.body.split('\n'))await send(line);return sendChecked(item.delimiter,20000,false);}
+-function lastPrompt(reply){const a=[...reply.matchAll(/(?:^|[\r\n])([^\r\n]*[>#])\s*(?=[\r\n]|$)/g)];return a.length?a[a.length-1][1]:''}
+-async function ensureConfigMode(){const prompt=lastPrompt(await sendChecked('',3000));if(!prompt)throw Error('Could not determine the IOS prompt.');if(/\(config[^)]*\)#\s*$/.test(prompt)){await sendChecked('end');}else if(!/#\s*$/.test(prompt)){throw Error('A privileged # prompt is required; enter enable manually, then retry.')}await sendChecked('configure terminal');}
+-$('connect').onclick=async()=>{try{if(!('serial' in navigator))throw Error('Web Serial is unavailable. Use Chromium/Edge via http://localhost.');serialPort=await navigator.serial.requestPort();await serialPort.open({baudRate:9600,dataBits:8,stopBits:1,parity:'none',flowControl:'none'});writer=serialPort.writable.getWriter();readLoop=true;readSerial();$('connect').disabled=true;$('inspect').disabled=false;$('disconnect').disabled=false;$('sendConsole').disabled=false;log('Serial connected at 9600 8N1. Use Console input for the initial dialog, then confirm the switch prompt is privileged (#).','ok');updateApply()}catch(e){if(e?.name==='NotFoundError')log('Serial-port selection was cancelled; no connection was opened.');else log('Serial connection failed: '+e.message,'bad')}};
+-$('sendConsole').onclick=async()=>{const value=$('consoleInput').value;try{if(value.includes('\n')||value.includes('\r'))throw Error('Console input accepts one line at a time.');await send(value);log('Console input sent: '+(value ? '[text]' : '[Enter]'));$('consoleInput').value='';$('consoleInput').focus()}catch(e){log('Console input failed: '+e.message,'bad')}};
+-$('consoleInput').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('sendConsole').click()}};
+-$('inspect').onclick=async()=>{try{serialText='';await send('terminal length 0');await send('show version');await send('show interfaces status');await send('show interfaces trunk');log('Read-only inspection commands sent. Paste/copy the status output into the parser if automatic capture is not sufficient.');}catch(e){log('Inspection failed: '+e.message,'bad')}};
+-async function waitForReaderRelease(timeoutMs=3000){const deadline=Date.now()+timeoutMs;while(reader&&Date.now()<deadline)await new Promise(r=>setTimeout(r,40));return !reader}
+-async function waitForPortRelease(port,timeoutMs=5000){const deadline=Date.now()+timeoutMs;while(Date.now()<deadline){if(!port.readable&&!port.writable)return true;await new Promise(r=>setTimeout(r,50));}return !port.readable&&!port.writable}
+-$('disconnect').onclick=async()=>{
+-  if(!serialPort||serialClosing)return;
+-  serialClosing=true;
+-  $('disconnect').disabled=true;
+-  readLoop=false;
+-  const port=serialPort;
+-  try {
+-    if(reader) await reader.cancel();
+-    if(!await waitForReaderRelease()) throw Error('serial reader did not release');
+-    if(writer){ writer.releaseLock(); writer=null; }
+-    try {
+-      await port.close();
+-    } catch(e) {
+-      if(!String(e.message||e).includes('already in progress')) throw e;
+-      if(!await waitForPortRelease(port)) throw Error('serial port is still closing; close the browser tab or wait before secure apply');
+-    }
+-    if(!await waitForPortRelease(port,1200)) throw Error('serial port did not release');
+-    serialPort=null;
+-    clearSecretState('Secrets cleared after serial disconnect.');
+-    $('connect').disabled=false;
+-    $('inspect').disabled=true;
+-    $('sendConsole').disabled=true;
+-    log('Serial disconnected and COM port released.','ok');
+-  } catch(e) {
+-    log('Disconnect did not release the COM port: '+e.message+'. Do not use secure apply; close the browser tab or Edge to force release.','bad');
+-  } finally {
+-    serialClosing=false;
+-    if(serialPort) $('disconnect').disabled=false;
+-    updateApply();
+-  }
+-};
+-$('apply').onclick=async()=>{if(!confirm('Apply the reviewed preview to the connected BENCH switch? This cannot be undone automatically.'))return;try{const lines=$('config').value.replace(/\r/g,'').split('\n').filter(Boolean).filter(line=>line!=='!');log(`Applying ${lines.length} command(s) with IOS prompt/error checks; no startup-config save will be performed.`);await ensureConfigMode();for(const line of lines)await sendChecked(line);await sendChecked('end');log(`Apply verified: ${lines.length} command(s) received an IOS prompt with no detected syntax error. Review the console, then save manually only if correct.`,'ok')}catch(e){log('Apply stopped: '+e.message,'bad')}};
+-let profile=null,secretBox=null,securePlan=null;
+-function envParse(t){const o={};for(const raw of t.split(/\r?\n/)){const l=raw.trim();if(!l||l.startsWith('#'))continue;const i=l.indexOf('=');if(i<1)throw Error('Invalid key-file line');o[l.slice(0,i).trim()]=l.slice(i+1).trim()}return o}
+-function ipv4List(value,name){if(!value)throw Error('Missing '+name);const items=value.split(',').map(x=>x.trim()).filter(Boolean);if(!items.length||items.length>100)throw Error(name+' must contain 1 through 100 comma-separated IPv4 addresses');const seen=new Set();for(const ip of items){const p=ip.split('.');if(p.length!==4||p.some(x=>!/^\d+$/.test(x)||Number(x)>255))throw Error('Invalid IPv4 address in '+name);if(seen.has(ip))throw Error('Duplicate IPv4 address in '+name);seen.add(ip)}return items}
+-async function derive(pass,salt){const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(pass),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:600000,hash:'SHA-256'},k,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+-function wipe(a){if(a?.fill)a.fill(0)}
+-async function unlockSecrets(){if(!secretBox||!$('unlockPass').value)throw Error('Re-enter the secret-container passphrase');const k=await derive($('unlockPass').value,secretBox.salt);let b;try{b=new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:secretBox.iv},k,secretBox.cipher))}catch{throw Error('Unable to unlock secrets. Re-enter the passphrase used when encrypting the imported key file.')}try{return envParse(new TextDecoder().decode(b))}finally{wipe(b)}}
+-function profileLines(secrets,redact){
+-  if(!profile||typeof profile!=='object')throw Error('Import a valid JSON profile');
+-  const expand=(value)=>String(value).replace(/\$\{([A-Z][A-Z0-9_]*)\}/g,(_,name)=>{if(redact)return '${'+name+'}';const v=secrets?.[name];if(!v)throw Error('Missing '+name);if(/[\r\n]/.test(v))throw Error('Invalid newline in '+name);return v});
+-  const model=$('secureModel').value.trim();
+-  const allowed=(profile.supported_models||[]).map(expand);
+-  if(allowed.length&&!allowed.includes(model))throw Error('Model is not allowed by imported profile');
+-  const a=[],add=(actual,redacted=actual)=>a.push({actual:expand(actual),redacted:expand(redacted),mode:'command'});
+-  for(const x of profile.base_commands||[])add(x);
+-  if(profile.diagnostics?.bootup_level)add('diagnostic bootup level '+profile.diagnostics.bootup_level);
+-  const archive=profile.archive_logging;
+-  if(archive?.enabled){add('archive');add(' log config');add('  logging enable');add('  logging size '+(archive.size||1000));if(archive.hidekeys)add('  hidekeys');if(archive.notify_syslog)add('  notify syslog contenttype plaintext');add(' exit');add('exit')}
+-  for(const v of profile.vlans||[]){const id=v.id||v;add('vlan '+id);if(v.name)add(' name '+v.name);add('exit')}
+-  const m=profile.management;
+-  if(m?.enabled!==false&&m){add('interface Vlan'+m.vlan);add(' ip address '+m.ip+' '+m.mask);add(' no shutdown');add('exit');add('ip default-gateway '+m.gateway)}
+-  for(const acl of profile.acls||[]){
+-    add('ip access-list '+(acl.type||'extended')+' '+acl.name);
+-    for(const e of acl.entries||[])add(' '+e);
+-    for(const spec of acl.source_host_lists||[]){
+-      if(!/^[A-Z][A-Z0-9_]*$/.test(spec.env||'')||!['tcp','udp'].includes(spec.protocol)||!Number.isInteger(spec.port)||spec.port<1||spec.port>65535)throw Error('Invalid ACL source-host-list definition');
+-      const count=redact?(secretBox?.listCounts?.[spec.env]||0):0;
+-      const sources=redact?Array.from({length:count},(_,i)=>'${'+spec.env+'['+(i+1)+']}'):ipv4List(secrets?.[spec.env],spec.env);
+-      if(!sources.length)throw Error('Encrypt a key file containing '+spec.env+' before rendering this ACL');
+-      const start=Number.isInteger(spec.sequence_start)?spec.sequence_start:10,step=Number.isInteger(spec.sequence_step)?spec.sequence_step:10;
+-      for(let i=0;i<sources.length;i++){
+-        const seq=start+(i*step),destination=expand(spec.destination);
+-        const actual=' '+seq+' permit '+spec.protocol+' host '+sources[i]+' host '+destination+' eq '+spec.port;
+-        const redacted=' '+seq+' permit '+spec.protocol+' host ${'+spec.env+'['+(i+1)+']} host '+expand(spec.destination)+' eq '+spec.port;
+-        add(actual,redacted);
+-      }
+-    }
+-    add('exit');
+-  }
+-  for(const x of profile.logging?.commands||[])add(x);
+-  for(const x of profile.ntp_servers||[])add('ntp server '+x);
+-  if(profile.ntp_access?.peer_acl)add('ntp access-group peer '+profile.ntp_access.peer_acl);
+-  if(profile.banners?.login){const b=String(profile.banners.login).replace(/\r/g,'');if(b.includes('^'))throw Error('Login banner cannot contain the ^ delimiter');a.push({actual:'banner login ^',redacted:'banner login ^\n'+b+'\n^',mode:'banner',body:b,delimiter:'^'})}
+-  const snmp=profile.snmp;
+-  if(snmp?.enabled){const u=snmp.username_env,ap=snmp.auth_password_env,pp=snmp.priv_password_env;if(!u||!ap||!pp)throw Error('SNMPv3 environment-variable names are required');const user=secrets?.[u]||'',auth=secrets?.[ap]||'',priv=secrets?.[pp]||'';if(!redact&&(!user||!auth||!priv))throw Error('Missing SNMPv3 credentials');add('snmp-server group '+snmp.group+' v3 priv access '+snmp.access_list);add('snmp-server group '+snmp.readonly_group+' v3 priv read '+snmp.view+' access '+snmp.access_list);add('snmp-server view '+snmp.view+' iso included');add('snmp-server location '+snmp.location);add('snmp-server user '+(redact?'${'+u+'}':user)+' '+snmp.group+' v3 auth '+snmp.auth_protocol+' '+(redact?'${'+ap+'}':auth)+' priv '+snmp.priv_protocol+' '+(redact?'${'+pp+'}':priv),'snmp-server user ${'+u+'} '+snmp.group+' v3 auth '+snmp.auth_protocol+' ${'+ap+'} priv '+snmp.priv_protocol+' ${'+pp+'}');for(const x of snmp.trap_commands||[])add(x);add('snmp-server host '+snmp.host+' version 3 priv '+(redact?'${'+u+'}':user),'snmp-server host '+snmp.host+' version 3 priv ${'+u+'}')}
+-  const qos=profile.qos;
+-  if(qos?.enabled){
+-    for(const cm of qos.class_maps||[]){if(!/^[A-Za-z0-9_-]+$/.test(cm.name)||!['match-all','match-any'].includes(cm.mode))throw Error('Invalid QoS class-map definition');add('class-map '+cm.mode+' '+cm.name);for(const x of cm.commands||[])add(' '+x);add('exit')}
+-    for(const pm of qos.policy_maps||[]){if(!/^[A-Za-z0-9_-]+$/.test(pm.name))throw Error('Invalid QoS policy-map definition');add('policy-map '+pm.name);for(const c of pm.classes||[]){if(!/^[A-Za-z0-9_-]+$/.test(c.name))throw Error('Invalid QoS policy class');add(' class '+c.name);for(const x of c.commands||[])add('  '+x);add(' exit')}add('exit')}
+-    for(const at of qos.attachments||[]){if(!/^[A-Za-z0-9/]+$/.test(at.interface)||!['input','output'].includes(at.direction)||!/^[A-Za-z0-9_-]+$/.test(at.policy))throw Error('Invalid QoS attachment');add('interface '+at.interface);add(' service-policy '+at.direction+' '+at.policy);add('exit')}
+-  }
+-  const aaa=profile.aaa;
+-  if(aaa?.enabled){
+-    add('aaa new-model');
+-    const policy=profile.password_policy;
+-    if(policy?.enabled){add('aaa common-criteria policy '+policy.name);add(' min-length '+policy.min_length);add(' max-length '+policy.max_length);add(' numeric-count '+policy.numeric_count);add(' upper-case '+policy.upper_case);add(' lower-case '+policy.lower_case);add(' special-case '+policy.special_case);add(' char-changes '+policy.char_changes);add('exit')}
+-    if(aaa.radius_source_interface)add('ip radius source-interface '+aaa.radius_source_interface);
+-    for(const srv of aaa.radius_servers||[]){const value=secrets?.[srv.secret_env]||'';if(!value&&!redact)throw Error('Missing '+srv.secret_env);add('radius server '+srv.name);add(' address ipv4 '+srv.address+' auth-port '+(srv.auth_port||1812)+' acct-port '+(srv.acct_port||1813));add(' timeout '+(srv.timeout||60));add(' key '+(redact?'${'+srv.secret_env+'}':value),' key ${'+srv.secret_env+'}');add('exit')}
+-    add('aaa group server radius '+(aaa.group_name||'RAD_SERVERS'));for(const srv of aaa.radius_servers||[])add(' server name '+srv.name);add('exit');
+-    const u=aaa.local_username_env||'LOCAL_ADMIN_USERNAME',pw=aaa.local_secret_env||'LOCAL_ADMIN_SECRET',en=aaa.enable_secret_env||'ENABLE_SECRET';
+-    if(!redact&&(!secrets[u]||!secrets[pw]||!secrets[en]))throw Error('Missing local credential value');
+-    add('enable algorithm-type scrypt secret '+(redact?'${'+en+'}':secrets[en]),'enable algorithm-type scrypt secret ${'+en+'}');
+-    add('username '+(redact?'${'+u+'}':secrets[u])+' privilege 15 '+(policy?.enabled?'common-criteria-policy '+policy.name+' ':'')+'secret '+(redact?'${'+pw+'}':secrets[pw]),'username ${'+u+'} privilege 15 '+(policy?.enabled?'common-criteria-policy '+policy.name+' ':'')+'secret ${'+pw+'}');if(policy?.enabled&&policy.remove_legacy_enable_password)add('no enable password');
+-    let lineContext=false;
+-    for(const x of aaa.commands||[]){if(/^line\s+/i.test(x)&&lineContext)add('exit');add(x);lineContext=/^line\s+/i.test(x)||lineContext}
+-    if(lineContext)add('exit');
+-  }
+-  const l2=profile.l2_access_policy;
+-  for(const p of ports){if(p.mode==='unused'||(p.used&&!p.includeUsed))continue;add('interface '+p.name);if(p.description)add(' description '+cleanDesc(p.description));if(p.mode==='access'){add(' switchport access vlan '+p.vlan);add(' switchport mode access');add(' switchport nonegotiate');add(' spanning-tree bpduguard enable');add(' switchport block unicast');const ps=l2?.port_security;if(ps?.enabled){add(' switchport port-security');add(' switchport port-security maximum '+(ps.maximum||2));add(' switchport port-security violation '+(ps.violation||'restrict'));if(ps.sticky)add(' switchport port-security mac-address sticky')}const sc=l2?.storm_control;if(sc?.enabled){add(' storm-control broadcast level '+sc.broadcast_level);add(' storm-control multicast level '+sc.multicast_level);if(sc.action)add(' storm-control action '+sc.action)}}else{add(' switchport trunk native vlan '+$('nativeVlan').value);add(' switchport trunk allowed vlan '+$('allowedVlans').value);add(' switchport mode trunk');add(' switchport nonegotiate');if(p.rootGuard)add(' spanning-tree guard root')}add(' '+(p.admin==='shutdown'?'shutdown':'no shutdown'));add('exit')}
+-  return a;
+-}
+-function updateSecureApply(){const ok=!!serialPort&&!!secretBox&&!!securePlan&&$('secureAck').checked&&$('secureApplyWord').value==='APPLY'&&!!$('unlockPass').value;$('secureApply').disabled=!ok}
+-$('profileFile').onchange=async()=>{clearSecretState('Profile replaced; secrets cleared.');try{profile=JSON.parse(await $('profileFile').files[0].text());$('profileStatus').textContent='Profile imported locally.'}catch(e){$('profileStatus').textContent=e.message}};
+-$('keyFile').onchange=()=>clearSecretState('Key file replaced; import it again to encrypt secrets.');
+-$('lockSecrets').onclick=async()=>{try{if(!$('keyFile').files[0]||!$('lockPass').value)throw Error('Choose key file and lock passphrase');const raw=await $('keyFile').files[0].text(),values=envParse(raw),listCounts={};for(const acl of profile?.acls||[])for(const spec of acl.source_host_lists||[])listCounts[spec.env]=ipv4List(values[spec.env],spec.env).length;const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),b=new TextEncoder().encode(raw),k=await derive($('lockPass').value,salt),cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv},k,b);wipe(b);for(const name of Object.keys(values))values[name]='';secretBox={salt,iv,cipher,listCounts};$('lockPass').value='';$('profileStatus').textContent='Secrets encrypted in active tab memory only.';updateSecureApply()}catch(e){log('Secret lock failed: '+e.message,'bad')}};
+-function clearSecretState(note='Secrets cleared.'){secretBox=null;securePlan=null;$('securePreview').value='';$('unlockPass').value='';$('profileStatus').textContent=note;updateSecureApply()}
+-$('clearSecrets').onclick=()=>clearSecretState();
+-window.addEventListener('beforeunload',()=>{secretBox=null;securePlan=null});
+-let secretIdleTimer=null;function touchSecrets(){if(secretIdleTimer)clearTimeout(secretIdleTimer);if(secretBox)secretIdleTimer=setTimeout(()=>clearSecretState('Secrets cleared after 10 minutes of inactivity.'),600000)}
+-['click','keydown','pointerdown'].forEach(e=>document.addEventListener(e,touchSecrets));
+-$('renderSecure').onclick=()=>{try{securePlan=profileLines(null,true);$('securePreview').value=securePlan.map(x=>x.redacted).join('\n');log('Redacted browser-only plan created.');updateSecureApply()}catch(e){log('Secure plan blocked: '+e.message,'bad')}};
+-$('secureAck').onchange=updateSecureApply;$('secureApplyWord').oninput=updateSecureApply;$('unlockPass').oninput=updateSecureApply;
+-$('secureApply').onclick=async()=>{let secrets=null,inConfig=false;try{if(!confirm('Apply the secure browser-only plan?'))return;secrets=await unlockSecrets();const lines=profileLines(secrets,false);suppressConsoleOutput=true;log('Applying secure plan; protected command output is suppressed.','');await ensureConfigMode();inConfig=true;for(const x of lines){if(x.mode==='banner')await sendBannerChecked(x);else await sendChecked(x.actual,5000,x.actual!==x.redacted);}await sendChecked('end');inConfig=false;$('unlockPass').value='';log('Secure browser-only apply verified with IOS prompt checks. Protected command output was not retained. Save manually after review.','ok')}catch(e){if(inConfig){try{await sendChecked('end',3000,true);log('Secure apply exited configuration mode after the error.')}catch{log('Secure apply could not confirm exit from configuration mode; inspect the switch console.','bad')}}log('Secure apply stopped: '+e.message,'bad')}finally{await new Promise(r=>setTimeout(r,1000));serialText='';suppressConsoleOutput=false;if(secrets){for(const k of Object.keys(secrets))secrets[k]='';}}};
+-ports=defaults(8);render();
+-</script>
++<script src="app.js"></script>
+ </body></html>
+diff --git a/app.js b/app.js
+new file mode 100644
+index 0000000..5812e88
+--- /dev/null
++++ b/app.js
+@@ -0,0 +1,229 @@
++'use strict';
++const $=id=>document.getElementById(id);
++const log=(m,kind='')=>{
++  const message=String(m);
++  const el=$('log');
++  el.textContent+=`\n[${new Date().toLocaleTimeString()}] ${message}`;
++  el.scrollTop=el.scrollHeight;
++  if(kind){
++    const status=$('serialStatus');
++    const badge=document.createElement('span');
++    badge.className=kind;
++    badge.textContent=message;
++    status.replaceChildren(badge);
++  }
++};
++let ports=[], selected=null, serialPort=null, writer=null, reader=null, readLoop=false, serialText='', serialClosing=false, suppressConsoleOutput=false;
++const defaults=(count)=>{
++  const a=[];
++  for(let n=1;n<=count;n++){
++    let vlan='',desc='OPEN';
++    if(n<=4){vlan='100';desc='VLAN 100';}
++    else if(n<=7){vlan='120';desc='VLAN 120';}
++    else if(n===8){vlan='108';desc='VLAN 108';}
++    a.push({name:`Gi1/0/${n}`,mode:vlan?'access':'unused',vlan,description:desc,admin:vlan?'no shutdown':'shutdown',used:false,includeUsed:false,rootGuard:false,default:true});
++  }
++  a.push({name:'Gi1/1/1',mode:'unused',vlan:'',description:'AUXILIARY UPLINK',admin:'shutdown',used:false,includeUsed:false,rootGuard:false,default:true});
++  a.push({name:'Gi1/1/2',mode:'unused',vlan:'',description:'AUXILIARY UPLINK',admin:'shutdown',used:false,includeUsed:false,rootGuard:false,default:true});
++  for(const n of [3,4])a.push({name:`Te1/1/${n}`,mode:'trunk',vlan:'',description:'TRUNK',admin:'no shutdown',used:false,includeUsed:false,rootGuard:false,default:true});
++  return a;
++};
++function appendPortText(parent,className,text){
++  const span=document.createElement('span');
++  span.className=className;
++  span.textContent=text;
++  parent.append(span);
++}
++function render(){
++  const box=$('ports');
++  box.replaceChildren();
++  ports.forEach((p,i)=>{
++    const b=document.createElement('button');
++    b.className='port';
++    b.classList.toggle('trunk',p.mode==='trunk');
++    b.classList.toggle('unassigned',p.mode==='unused');
++    b.classList.toggle('used',p.used);
++    b.classList.toggle('active',selected===i);
++    appendPortText(b,'name',p.name);
++    appendPortText(b,'meta',p.mode==='access'?`Access VLAN ${p.vlan||'—'}`:p.mode==='trunk'?'Trunk':'Unassigned');
++    appendPortText(b,'meta',p.description||'');
++    if(p.used)appendPortText(b,'meta bad','IN USE / protected');
++    b.onclick=()=>select(i);
++    box.append(b);
++  });
++  updateApply();
++}
++function select(i){
++  selected=i;
++  const p=ports[i];
++  $('editor').classList.remove('hidden');
++  $('selectedInfo').textContent=`Editing ${p.name}${p.used?' — discovered in use; excluded unless explicitly included.':''}`;
++  $('mode').value=p.mode;
++  $('vlan').value=p.vlan;
++  $('adminState').value=p.admin||'no shutdown';
++  $('description').value=p.description;
++  $('includeUsed').checked=p.includeUsed;
++  $('rootGuard').checked=!!p.rootGuard;
++  render();
++}
++function validVlan(v){return /^([1-9]|[1-9]\d{1,3}|[1-3]\d{3}|40[0-8]\d|409[0-4])$/.test(v)&&+v<=4094}
++$('savePort').onclick=()=>{if(selected===null)return;const p=ports[selected], mode=$('mode').value, vlan=$('vlan').value.trim(), admin=$('adminState').value, desc=$('description').value.trim();if(mode==='access'&&!validVlan(vlan)){alert('Enter an access VLAN from 1 through 4094.');return}p.mode=mode;p.vlan=mode==='access'?vlan:'';p.admin=(admin==='shutdown'?'shutdown':'no shutdown');p.description=desc;p.includeUsed=$('includeUsed').checked;p.rootGuard=$('rootGuard').checked;p.default=false;render()};
++$('resetPort').onclick=()=>{if(selected===null)return;const fresh=defaults(+$('portCount').value).find(p=>p.name===ports[selected].name);fresh.used=ports[selected].used;ports[selected]=fresh;select(selected)};
++$('portCount').onchange=()=>{ports=defaults(+$('portCount').value);selected=null;$('editor').classList.add('hidden');$('selectedInfo').textContent='Click a port to edit it.';render();log('Port profile reset to '+$('portCount').value+' access ports.','')};
++function regexEscape(value){
++  return String(value).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
++}
++function parseUsage(text,source='pasted output'){
++  if(!text.trim()){
++    log(`Port-use parser skipped: no ${source} is available. Run read-only inspection, wait for output, then use Parse captured serial output or paste show interfaces status output.`,'bad');
++    return;
++  }
++  let hits=0;
++  for(const p of ports){
++    const long=p.name.replace(/^Gi/,'GigabitEthernet').replace(/^Te/,'TenGigabitEthernet');
++    const re=new RegExp(`(?:^|\\n)\\s*(?:${regexEscape(p.name)}|${regexEscape(long)})\\s+(.+)$`,'mi');
++    const m=text.match(re);
++    if(m){
++      const state=m[1].toLowerCase();
++      const inUse=/\bconnected\b/.test(state)&&!(/notconnect|disabled|err-disabled/.test(state));
++      p.used=inUse;
++      if(inUse)hits++;
++    }
++  }
++  render();
++  log(`Parsed ${source}: ${hits} currently connected port(s) marked protected.`);
++}
++$('parseStatus').onclick=()=>parseUsage($('statusPaste').value,'pasted status output');
++$('parseCapturedStatus').onclick=()=>parseUsage(serialText,'captured serial output');
++function cleanDesc(s){return s.replace(/[\r\n]/g,' ').replace(/[^\w .,:()\/-]/g,'').slice(0,120)}
++function buildConfig(){const lines=[];const host=$('hostname').value.trim();if(host){if(!/^[A-Za-z0-9][A-Za-z0-9-]{0,62}$/.test(host))throw Error('Hostname may contain letters, digits, and hyphens only.');lines.push(`hostname ${host}`,'!')}const native=$('nativeVlan').value.trim(), allowed=$('allowedVlans').value.trim();if(!validVlan(native))throw Error('Trunk native VLAN must be 1 through 4094.');if(!/^\d+(,\d+)*$/.test(allowed)||allowed.split(',').some(v=>!validVlan(v)))throw Error('Allowed VLANs must be a comma-separated list of VLAN IDs.');let changed=0;for(const p of ports){if(p.mode==='unused'||(p.used&&!p.includeUsed))continue;lines.push(`interface ${p.name}`);if(p.description)lines.push(` description ${cleanDesc(p.description)}`);if(p.mode==='access'){lines.push(` switchport access vlan ${p.vlan}`,' switchport mode access',' switchport nonegotiate',' spanning-tree bpduguard enable',' switchport block unicast')}else{lines.push(` switchport trunk native vlan ${native}`,` switchport trunk allowed vlan ${allowed}`,' switchport mode trunk',' switchport nonegotiate');if(p.rootGuard)lines.push(' spanning-tree guard root')}lines.push(` ${p.admin==='shutdown'?'shutdown':'no shutdown'}`);lines.push('!');changed++}if(!changed&&!host)throw Error('Nothing is selected for configuration.');return lines.join('\n')+'\n'}
++$('build').onclick=()=>{try{$('config').value=buildConfig();$('download').disabled=false;log('Configuration built. Review it before any serial application.')}catch(e){alert(e.message);log('Build blocked: '+e.message,'bad')}};
++$('download').onclick=()=>{const body=$('config').value;if(!body)return;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([body],{type:'text/plain'}));a.download=($('hostname').value.trim()||'switch')+'-bench-config.cfg';a.click();URL.revokeObjectURL(a.href)};
++function updateApply(){const ready=!!serialPort&&$('ack').checked&&$('applyWord').value==='APPLY'&&!!$('config').value;$('apply').disabled=!ready}$('ack').onchange=updateApply;$('applyWord').oninput=updateApply;$('config').oninput=updateApply;
++async function readSerial(){const decoder=new TextDecoder();try{while(readLoop&&serialPort?.readable){reader=serialPort.readable.getReader();try{while(readLoop){const {value,done}=await reader.read();if(done)break;if(value){const t=decoder.decode(value);serialText+=t;if(!suppressConsoleOutput){$('log').textContent+=t;$('log').scrollTop=$('log').scrollHeight;}}}}finally{reader.releaseLock();reader=null}}}catch(e){log('Serial read error: '+e.message,'bad')}}
++async function send(line){if(!writer)throw Error('Serial writer is unavailable.');await writer.write(new TextEncoder().encode(line+'\r'));await new Promise(r=>setTimeout(r,160));}
++async function sendChecked(line, timeoutMs=5000, sensitive=false){const start=serialText.length;await send(line);const deadline=Date.now()+timeoutMs;while(Date.now()<deadline){const reply=serialText.slice(start);if(/% (?:Invalid input|Incomplete command|Ambiguous command|Error)/i.test(reply))throw Error(sensitive?'IOS rejected a protected command; inspect the switch locally.':'IOS rejected "'+line+'": '+reply.replace(/\s+/g,' ').slice(-260));if(/(?:^|[\r\n])[^\r\n]*[>#]\s*(?=[\r\n]|$)/.test(reply))return reply;await new Promise(r=>setTimeout(r,35));}throw Error(sensitive?'Timed out waiting for IOS after a protected command; inspect the switch locally.':`Timed out waiting for the IOS prompt after "${line}". Apply stopped; inspect the console before continuing.`);}
++async function sendBannerChecked(item){await send(item.actual);for(const line of item.body.split('\n'))await send(line);return sendChecked(item.delimiter,20000,false);}
++function lastPrompt(reply){const a=[...reply.matchAll(/(?:^|[\r\n])([^\r\n]*[>#])\s*(?=[\r\n]|$)/g)];return a.length?a[a.length-1][1]:''}
++async function ensureConfigMode(){const prompt=lastPrompt(await sendChecked('',3000));if(!prompt)throw Error('Could not determine the IOS prompt.');if(/\(config[^)]*\)#\s*$/.test(prompt)){await sendChecked('end');}else if(!/#\s*$/.test(prompt)){throw Error('A privileged # prompt is required; enter enable manually, then retry.')}await sendChecked('configure terminal');}
++$('connect').onclick=async()=>{try{if(!('serial' in navigator))throw Error('Web Serial is unavailable. Use Chromium/Edge via http://localhost.');serialPort=await navigator.serial.requestPort();await serialPort.open({baudRate:9600,dataBits:8,stopBits:1,parity:'none',flowControl:'none'});writer=serialPort.writable.getWriter();readLoop=true;readSerial();$('connect').disabled=true;$('inspect').disabled=false;$('disconnect').disabled=false;$('sendConsole').disabled=false;log('Serial connected at 9600 8N1. Use Console input for the initial dialog, then confirm the switch prompt is privileged (#).','ok');updateApply()}catch(e){if(e?.name==='NotFoundError')log('Serial-port selection was cancelled; no connection was opened.');else log('Serial connection failed: '+e.message,'bad')}};
++$('sendConsole').onclick=async()=>{const value=$('consoleInput').value;try{if(value.includes('\n')||value.includes('\r'))throw Error('Console input accepts one line at a time.');await send(value);log('Console input sent: '+(value ? '[text]' : '[Enter]'));$('consoleInput').value='';$('consoleInput').focus()}catch(e){log('Console input failed: '+e.message,'bad')}};
++$('consoleInput').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('sendConsole').click()}};
++$('inspect').onclick=async()=>{try{serialText='';await send('terminal length 0');await send('show version');await send('show interfaces status');await send('show interfaces trunk');log('Read-only inspection commands sent. Paste/copy the status output into the parser if automatic capture is not sufficient.');}catch(e){log('Inspection failed: '+e.message,'bad')}};
++async function waitForReaderRelease(timeoutMs=3000){const deadline=Date.now()+timeoutMs;while(reader&&Date.now()<deadline)await new Promise(r=>setTimeout(r,40));return !reader}
++async function waitForPortRelease(port,timeoutMs=5000){const deadline=Date.now()+timeoutMs;while(Date.now()<deadline){if(!port.readable&&!port.writable)return true;await new Promise(r=>setTimeout(r,50));}return !port.readable&&!port.writable}
++$('disconnect').onclick=async()=>{
++  if(!serialPort||serialClosing)return;
++  serialClosing=true;
++  $('disconnect').disabled=true;
++  readLoop=false;
++  const port=serialPort;
++  try {
++    if(reader) await reader.cancel();
++    if(!await waitForReaderRelease()) throw Error('serial reader did not release');
++    if(writer){ writer.releaseLock(); writer=null; }
++    try {
++      await port.close();
++    } catch(e) {
++      if(!String(e.message||e).includes('already in progress')) throw e;
++      if(!await waitForPortRelease(port)) throw Error('serial port is still closing; close the browser tab or wait before secure apply');
++    }
++    if(!await waitForPortRelease(port,1200)) throw Error('serial port did not release');
++    serialPort=null;
++    clearSecretState('Secrets cleared after serial disconnect.');
++    $('connect').disabled=false;
++    $('inspect').disabled=true;
++    $('sendConsole').disabled=true;
++    log('Serial disconnected and COM port released.','ok');
++  } catch(e) {
++    log('Disconnect did not release the COM port: '+e.message+'. Do not use secure apply; close the browser tab or Edge to force release.','bad');
++  } finally {
++    serialClosing=false;
++    if(serialPort) $('disconnect').disabled=false;
++    updateApply();
++  }
++};
++$('apply').onclick=async()=>{if(!confirm('Apply the reviewed preview to the connected BENCH switch? This cannot be undone automatically.'))return;try{const lines=$('config').value.replace(/\r/g,'').split('\n').filter(Boolean).filter(line=>line!=='!');log(`Applying ${lines.length} command(s) with IOS prompt/error checks; no startup-config save will be performed.`);await ensureConfigMode();for(const line of lines)await sendChecked(line);await sendChecked('end');log(`Apply verified: ${lines.length} command(s) received an IOS prompt with no detected syntax error. Review the console, then save manually only if correct.`,'ok')}catch(e){log('Apply stopped: '+e.message,'bad')}};
++let profile=null,secretBox=null,securePlan=null;
++function envParse(t){const o={};for(const raw of t.split(/\r?\n/)){const l=raw.trim();if(!l||l.startsWith('#'))continue;const i=l.indexOf('=');if(i<1)throw Error('Invalid key-file line');o[l.slice(0,i).trim()]=l.slice(i+1).trim()}return o}
++function ipv4List(value,name){if(!value)throw Error('Missing '+name);const items=value.split(',').map(x=>x.trim()).filter(Boolean);if(!items.length||items.length>100)throw Error(name+' must contain 1 through 100 comma-separated IPv4 addresses');const seen=new Set();for(const ip of items){const p=ip.split('.');if(p.length!==4||p.some(x=>!/^\d+$/.test(x)||Number(x)>255))throw Error('Invalid IPv4 address in '+name);if(seen.has(ip))throw Error('Duplicate IPv4 address in '+name);seen.add(ip)}return items}
++async function derive(pass,salt){const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(pass),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:600000,hash:'SHA-256'},k,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
++function wipe(a){if(a?.fill)a.fill(0)}
++async function unlockSecrets(){if(!secretBox||!$('unlockPass').value)throw Error('Re-enter the secret-container passphrase');const k=await derive($('unlockPass').value,secretBox.salt);let b;try{b=new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:secretBox.iv},k,secretBox.cipher))}catch{throw Error('Unable to unlock secrets. Re-enter the passphrase used when encrypting the imported key file.')}try{return envParse(new TextDecoder().decode(b))}finally{wipe(b)}}
++function profileLines(secrets,redact){
++  if(!profile||typeof profile!=='object')throw Error('Import a valid JSON profile');
++  const expand=(value)=>String(value).replace(/\$\{([A-Z][A-Z0-9_]*)\}/g,(_,name)=>{if(redact)return '${'+name+'}';const v=secrets?.[name];if(!v)throw Error('Missing '+name);if(/[\r\n]/.test(v))throw Error('Invalid newline in '+name);return v});
++  const model=$('secureModel').value.trim();
++  const allowed=(profile.supported_models||[]).map(expand);
++  if(allowed.length&&!allowed.includes(model))throw Error('Model is not allowed by imported profile');
++  const a=[],add=(actual,redacted=actual)=>a.push({actual:expand(actual),redacted:expand(redacted),mode:'command'});
++  for(const x of profile.base_commands||[])add(x);
++  if(profile.diagnostics?.bootup_level)add('diagnostic bootup level '+profile.diagnostics.bootup_level);
++  const archive=profile.archive_logging;
++  if(archive?.enabled){add('archive');add(' log config');add('  logging enable');add('  logging size '+(archive.size||1000));if(archive.hidekeys)add('  hidekeys');if(archive.notify_syslog)add('  notify syslog contenttype plaintext');add(' exit');add('exit')}
++  for(const v of profile.vlans||[]){const id=v.id||v;add('vlan '+id);if(v.name)add(' name '+v.name);add('exit')}
++  const m=profile.management;
++  if(m?.enabled!==false&&m){add('interface Vlan'+m.vlan);add(' ip address '+m.ip+' '+m.mask);add(' no shutdown');add('exit');add('ip default-gateway '+m.gateway)}
++  for(const acl of profile.acls||[]){
++    add('ip access-list '+(acl.type||'extended')+' '+acl.name);
++    for(const e of acl.entries||[])add(' '+e);
++    for(const spec of acl.source_host_lists||[]){
++      if(!/^[A-Z][A-Z0-9_]*$/.test(spec.env||'')||!['tcp','udp'].includes(spec.protocol)||!Number.isInteger(spec.port)||spec.port<1||spec.port>65535)throw Error('Invalid ACL source-host-list definition');
++      const count=redact?(secretBox?.listCounts?.[spec.env]||0):0;
++      const sources=redact?Array.from({length:count},(_,i)=>'${'+spec.env+'['+(i+1)+']}'):ipv4List(secrets?.[spec.env],spec.env);
++      if(!sources.length)throw Error('Encrypt a key file containing '+spec.env+' before rendering this ACL');
++      const start=Number.isInteger(spec.sequence_start)?spec.sequence_start:10,step=Number.isInteger(spec.sequence_step)?spec.sequence_step:10;
++      for(let i=0;i<sources.length;i++){
++        const seq=start+(i*step),destination=expand(spec.destination);
++        const actual=' '+seq+' permit '+spec.protocol+' host '+sources[i]+' host '+destination+' eq '+spec.port;
++        const redacted=' '+seq+' permit '+spec.protocol+' host ${'+spec.env+'['+(i+1)+']} host '+expand(spec.destination)+' eq '+spec.port;
++        add(actual,redacted);
++      }
++    }
++    add('exit');
++  }
++  for(const x of profile.logging?.commands||[])add(x);
++  for(const x of profile.ntp_servers||[])add('ntp server '+x);
++  if(profile.ntp_access?.peer_acl)add('ntp access-group peer '+profile.ntp_access.peer_acl);
++  if(profile.banners?.login){const b=String(profile.banners.login).replace(/\r/g,'');if(b.includes('^'))throw Error('Login banner cannot contain the ^ delimiter');a.push({actual:'banner login ^',redacted:'banner login ^\n'+b+'\n^',mode:'banner',body:b,delimiter:'^'})}
++  const snmp=profile.snmp;
++  if(snmp?.enabled){const u=snmp.username_env,ap=snmp.auth_password_env,pp=snmp.priv_password_env;if(!u||!ap||!pp)throw Error('SNMPv3 environment-variable names are required');const user=secrets?.[u]||'',auth=secrets?.[ap]||'',priv=secrets?.[pp]||'';if(!redact&&(!user||!auth||!priv))throw Error('Missing SNMPv3 credentials');add('snmp-server group '+snmp.group+' v3 priv access '+snmp.access_list);add('snmp-server group '+snmp.readonly_group+' v3 priv read '+snmp.view+' access '+snmp.access_list);add('snmp-server view '+snmp.view+' iso included');add('snmp-server location '+snmp.location);add('snmp-server user '+(redact?'${'+u+'}':user)+' '+snmp.group+' v3 auth '+snmp.auth_protocol+' '+(redact?'${'+ap+'}':auth)+' priv '+snmp.priv_protocol+' '+(redact?'${'+pp+'}':priv),'snmp-server user ${'+u+'} '+snmp.group+' v3 auth '+snmp.auth_protocol+' ${'+ap+'} priv '+snmp.priv_protocol+' ${'+pp+'}');for(const x of snmp.trap_commands||[])add(x);add('snmp-server host '+snmp.host+' version 3 priv '+(redact?'${'+u+'}':user),'snmp-server host '+snmp.host+' version 3 priv ${'+u+'}')}
++  const qos=profile.qos;
++  if(qos?.enabled){
++    for(const cm of qos.class_maps||[]){if(!/^[A-Za-z0-9_-]+$/.test(cm.name)||!['match-all','match-any'].includes(cm.mode))throw Error('Invalid QoS class-map definition');add('class-map '+cm.mode+' '+cm.name);for(const x of cm.commands||[])add(' '+x);add('exit')}
++    for(const pm of qos.policy_maps||[]){if(!/^[A-Za-z0-9_-]+$/.test(pm.name))throw Error('Invalid QoS policy-map definition');add('policy-map '+pm.name);for(const c of pm.classes||[]){if(!/^[A-Za-z0-9_-]+$/.test(c.name))throw Error('Invalid QoS policy class');add(' class '+c.name);for(const x of c.commands||[])add('  '+x);add(' exit')}add('exit')}
++    for(const at of qos.attachments||[]){if(!/^[A-Za-z0-9/]+$/.test(at.interface)||!['input','output'].includes(at.direction)||!/^[A-Za-z0-9_-]+$/.test(at.policy))throw Error('Invalid QoS attachment');add('interface '+at.interface);add(' service-policy '+at.direction+' '+at.policy);add('exit')}
++  }
++  const aaa=profile.aaa;
++  if(aaa?.enabled){
++    add('aaa new-model');
++    const policy=profile.password_policy;
++    if(policy?.enabled){add('aaa common-criteria policy '+policy.name);add(' min-length '+policy.min_length);add(' max-length '+policy.max_length);add(' numeric-count '+policy.numeric_count);add(' upper-case '+policy.upper_case);add(' lower-case '+policy.lower_case);add(' special-case '+policy.special_case);add(' char-changes '+policy.char_changes);add('exit')}
++    if(aaa.radius_source_interface)add('ip radius source-interface '+aaa.radius_source_interface);
++    for(const srv of aaa.radius_servers||[]){const value=secrets?.[srv.secret_env]||'';if(!value&&!redact)throw Error('Missing '+srv.secret_env);add('radius server '+srv.name);add(' address ipv4 '+srv.address+' auth-port '+(srv.auth_port||1812)+' acct-port '+(srv.acct_port||1813));add(' timeout '+(srv.timeout||60));add(' key '+(redact?'${'+srv.secret_env+'}':value),' key ${'+srv.secret_env+'}');add('exit')}
++    add('aaa group server radius '+(aaa.group_name||'RAD_SERVERS'));for(const srv of aaa.radius_servers||[])add(' server name '+srv.name);add('exit');
++    const u=aaa.local_username_env||'LOCAL_ADMIN_USERNAME',pw=aaa.local_secret_env||'LOCAL_ADMIN_SECRET',en=aaa.enable_secret_env||'ENABLE_SECRET';
++    if(!redact&&(!secrets[u]||!secrets[pw]||!secrets[en]))throw Error('Missing local credential value');
++    add('enable algorithm-type scrypt secret '+(redact?'${'+en+'}':secrets[en]),'enable algorithm-type scrypt secret ${'+en+'}');
++    add('username '+(redact?'${'+u+'}':secrets[u])+' privilege 15 '+(policy?.enabled?'common-criteria-policy '+policy.name+' ':'')+'secret '+(redact?'${'+pw+'}':secrets[pw]),'username ${'+u+'} privilege 15 '+(policy?.enabled?'common-criteria-policy '+policy.name+' ':'')+'secret ${'+pw+'}');if(policy?.enabled&&policy.remove_legacy_enable_password)add('no enable password');
++    let lineContext=false;
++    for(const x of aaa.commands||[]){if(/^line\s+/i.test(x)&&lineContext)add('exit');add(x);lineContext=/^line\s+/i.test(x)||lineContext}
++    if(lineContext)add('exit');
++  }
++  const l2=profile.l2_access_policy;
++  for(const p of ports){if(p.mode==='unused'||(p.used&&!p.includeUsed))continue;add('interface '+p.name);if(p.description)add(' description '+cleanDesc(p.description));if(p.mode==='access'){add(' switchport access vlan '+p.vlan);add(' switchport mode access');add(' switchport nonegotiate');add(' spanning-tree bpduguard enable');add(' switchport block unicast');const ps=l2?.port_security;if(ps?.enabled){add(' switchport port-security');add(' switchport port-security maximum '+(ps.maximum||2));add(' switchport port-security violation '+(ps.violation||'restrict'));if(ps.sticky)add(' switchport port-security mac-address sticky')}const sc=l2?.storm_control;if(sc?.enabled){add(' storm-control broadcast level '+sc.broadcast_level);add(' storm-control multicast level '+sc.multicast_level);if(sc.action)add(' storm-control action '+sc.action)}}else{add(' switchport trunk native vlan '+$('nativeVlan').value);add(' switchport trunk allowed vlan '+$('allowedVlans').value);add(' switchport mode trunk');add(' switchport nonegotiate');if(p.rootGuard)add(' spanning-tree guard root')}add(' '+(p.admin==='shutdown'?'shutdown':'no shutdown'));add('exit')}
++  return a;
++}
++function updateSecureApply(){const ok=!!serialPort&&!!secretBox&&!!securePlan&&$('secureAck').checked&&$('secureApplyWord').value==='APPLY'&&!!$('unlockPass').value;$('secureApply').disabled=!ok}
++$('profileFile').onchange=async()=>{clearSecretState('Profile replaced; secrets cleared.');try{profile=JSON.parse(await $('profileFile').files[0].text());$('profileStatus').textContent='Profile imported locally.'}catch(e){$('profileStatus').textContent=e.message}};
++$('keyFile').onchange=()=>clearSecretState('Key file replaced; import it again to encrypt secrets.');
++$('lockSecrets').onclick=async()=>{try{if(!$('keyFile').files[0]||!$('lockPass').value)throw Error('Choose key file and lock passphrase');const raw=await $('keyFile').files[0].text(),values=envParse(raw),listCounts={};for(const acl of profile?.acls||[])for(const spec of acl.source_host_lists||[])listCounts[spec.env]=ipv4List(values[spec.env],spec.env).length;const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),b=new TextEncoder().encode(raw),k=await derive($('lockPass').value,salt),cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv},k,b);wipe(b);for(const name of Object.keys(values))values[name]='';secretBox={salt,iv,cipher,listCounts};$('lockPass').value='';$('profileStatus').textContent='Secrets encrypted in active tab memory only.';updateSecureApply()}catch(e){log('Secret lock failed: '+e.message,'bad')}};
++function clearSecretState(note='Secrets cleared.'){secretBox=null;securePlan=null;$('securePreview').value='';$('unlockPass').value='';$('profileStatus').textContent=note;updateSecureApply()}
++$('clearSecrets').onclick=()=>clearSecretState();
++window.addEventListener('beforeunload',()=>{secretBox=null;securePlan=null});
++let secretIdleTimer=null;function touchSecrets(){if(secretIdleTimer)clearTimeout(secretIdleTimer);if(secretBox)secretIdleTimer=setTimeout(()=>clearSecretState('Secrets cleared after 10 minutes of inactivity.'),600000)}
++['click','keydown','pointerdown'].forEach(e=>document.addEventListener(e,touchSecrets));
++$('renderSecure').onclick=()=>{try{securePlan=profileLines(null,true);$('securePreview').value=securePlan.map(x=>x.redacted).join('\n');log('Redacted browser-only plan created.');updateSecureApply()}catch(e){log('Secure plan blocked: '+e.message,'bad')}};
++$('secureAck').onchange=updateSecureApply;$('secureApplyWord').oninput=updateSecureApply;$('unlockPass').oninput=updateSecureApply;
++$('secureApply').onclick=async()=>{let secrets=null,inConfig=false;try{if(!confirm('Apply the secure browser-only plan?'))return;secrets=await unlockSecrets();const lines=profileLines(secrets,false);suppressConsoleOutput=true;log('Applying secure plan; protected command output is suppressed.','');await ensureConfigMode();inConfig=true;for(const x of lines){if(x.mode==='banner')await sendBannerChecked(x);else await sendChecked(x.actual,5000,x.actual!==x.redacted);}await sendChecked('end');inConfig=false;$('unlockPass').value='';log('Secure browser-only apply verified with IOS prompt checks. Protected command output was not retained. Save manually after review.','ok')}catch(e){if(inConfig){try{await sendChecked('end',3000,true);log('Secure apply exited configuration mode after the error.')}catch{log('Secure apply could not confirm exit from configuration mode; inspect the switch console.','bad')}}log('Secure apply stopped: '+e.message,'bad')}finally{await new Promise(r=>setTimeout(r,1000));serialText='';suppressConsoleOutput=false;if(secrets){for(const k of Object.keys(secrets))secrets[k]='';}}};
++ports=defaults(8);render();
+diff --git a/styles.css b/styles.css
+new file mode 100644
+index 0000000..3e51a09
+--- /dev/null
++++ b/styles.css
+@@ -0,0 +1,10 @@
++:root{color-scheme:dark;--bg:#10151c;--panel:#18212c;--line:#344458;--text:#e8eef6;--muted:#a9b8ca;--blue:#48a6ff;--green:#55d39a;--amber:#ffbf52;--red:#ff7583}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,sans-serif}header{padding:20px max(20px,calc((100vw - 1450px)/2));border-bottom:1px solid var(--line);background:#121b26}h1{margin:0;font-size:1.55rem}h2{font-size:1.05rem;margin:0 0 12px}h3{font-size:.95rem;margin:14px 0 6px}.sub,.note{color:var(--muted)}main{max-width:1450px;margin:auto;padding:18px;display:grid;grid-template-columns:390px 1fr;gap:18px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:15px;margin-bottom:14px}.wide{grid-column:1/-1}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.triple{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}label{display:block;font-weight:650;margin:0 0 4px}input,select,textarea,button{font:inherit}input,select,textarea{width:100%;padding:8px;border-radius:6px;border:1px solid var(--line);background:#0e151e;color:var(--text)}textarea{min-height:130px;resize:vertical;font-family:ui-monospace,monospace;font-size:12px}button{padding:9px 11px;border:1px solid #3379b9;border-radius:6px;background:#1d71ad;color:white;cursor:pointer;font-weight:650}button.secondary{background:#263545;border-color:#506277}button.danger{background:#822b3a;border-color:#c84e61}button:disabled{opacity:.45;cursor:not-allowed}.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.warning{border-left:4px solid var(--amber);padding:9px 11px;background:#302719;color:#ffe0a5}.danger-note{border-left:4px solid var(--red);padding:9px 11px;background:#352026;color:#ffc5ca}.ok{color:var(--green)}.bad{color:var(--red)}.hidden{display:none!important}.ports{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:9px}.port{min-height:112px;text-align:left;background:#142334;border-color:#3d5873;padding:9px}.port.active{outline:3px solid var(--blue)}.port .name{font-weight:800;display:block}.port .meta{font-size:.82rem;color:#cbd7e5;display:block;margin-top:4px}.port.used{border-color:var(--amber);background:#342b1e}.port.trunk{border-color:#a67ae9;background:#29213a}.port.unassigned{opacity:.78}.legend{display:flex;gap:15px;flex-wrap:wrap;font-size:.86rem;color:var(--muted);margin:0 0 12px}.dot{display:inline-block;width:10px;height:10px;border-radius:99px;margin-right:4px}.console{min-height:120px;white-space:pre-wrap;background:#090d12;border:1px solid #334052;border-radius:6px;padding:10px;font:12px/1.4 ui-monospace,monospace;overflow:auto;max-height:280px}.check{display:flex;gap:8px;align-items:start;margin:8px 0}.check input{width:auto;margin-top:3px}.pill{display:inline-block;padding:2px 7px;border-radius:99px;background:#24374b;color:#cbe5ff;font-size:.8rem}details summary{cursor:pointer;font-weight:700}@media(max-width:900px){main{grid-template-columns:1fr}.wide{grid-column:auto}}@media(max-width:540px){.grid,.triple{grid-template-columns:1fr}}
++
++/* FAQ page layout */
++a{color:var(--blue)}
++a:focus-visible{outline:3px solid var(--amber);outline-offset:3px;border-radius:3px}
++.faq{max-width:920px;display:block;margin:auto;padding:24px 20px 48px}
++.faq .panel{margin:16px 0}
++.faq code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;background:#0e151e;padding:1px 4px;border-radius:3px}
++.faq li+li{margin-top:7px}
++.dot-access{background:#48a6ff}.dot-trunk{background:#a67ae9}.dot-protected{background:#ffbf52}
+diff --git a/faq.html b/faq.html
+new file mode 100644
+index 0000000..a79d4fd
+--- /dev/null
++++ b/faq.html
+@@ -0,0 +1,60 @@
++<!doctype html>
++<html lang="en">
++<head>
++<meta charset="utf-8">
++<meta name="viewport" content="width=device-width,initial-scale=1">
++<meta http-equiv="Content-Security-Policy"
++  content="default-src 'none'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
++<title>Switch Bench Provisioner FAQ</title>
++<link rel="stylesheet" href="styles.css">
++</head>
++<body>
++<header>
++  <h1>Switch Bench Provisioner FAQ</h1>
++  <p class="sub">Browser-only Cisco IOS / IOS-XE bench-provisioning guidance.</p>
++</header>
++<main class="faq">
++  <p><a href="index.html">← Return to the provisioner</a></p>
++
++  <section class="panel">
++    <h2>What is this tool for?</h2>
++    <p>It is a bench-only planning and browser-serial provisioning tool for supported Cisco Catalyst IOS / IOS-XE switches. Review generated configuration before applying it, and manually save the switch configuration only after validating the result.</p>
++  </section>
++
++  <section class="panel">
++    <h2>Does the hosted demo upload my profile, key file, serial output, or credentials?</h2>
++    <p>No. The application is static and processes files selected by you in the browser. It has no application API, upload endpoint, analytics request, or server-side serial service. Imported key-file content is encrypted in active-tab memory and is cleared on the documented clear, replacement, disconnect, unload, and inactivity events.</p>
++    <p class="warning">This protects against routine persistence and accidental exposure. Do not import real credentials into a browser or workstation you do not trust, and do not commit a real <code>.env</code> file to Git.</p>
++  </section>
++
++  <section class="panel">
++    <h2>Where do I get the example files?</h2>
++    <ul>
++      <li><a href="https://github.com/Blacknight318/Switch_Bench_Provisioner_Browser_Only_Full/blob/main/.env.example" target="_blank" rel="noopener noreferrer">View .env.example on GitHub</a></li>
++      <li><a href="https://github.com/Blacknight318/Switch_Bench_Provisioner_Browser_Only_Full/blob/main/profile.distribution.example.json" target="_blank" rel="noopener noreferrer">View profile.distribution.example.json on GitHub</a></li>
++    </ul>
++    <p>Copy each example locally. Use a private <code>.env</code> for site values and secrets; keep <code>profile.distribution.example.json</code> as the reusable sanitized template. Do not publish a site-specific profile unless it is reviewed and intentionally sanitized.</p>
++  </section>
++
++  <section class="panel">
++    <h2>Which browser should I use for serial access?</h2>
++    <p>Use Chromium or Microsoft Edge over HTTPS or <code>http://localhost</code>. Web Serial requires you to explicitly choose a serial device; the web page cannot silently open a serial port.</p>
++  </section>
++
++  <section class="panel">
++    <h2>Will the tool update switch firmware?</h2>
++    <p>No. Firmware updates are intentionally out of scope. Image transfer, image integrity, storage capacity, install/bundle mode, boot variables, compatibility, and rollback must be validated for the exact model and release before any write action.</p>
++  </section>
++
++  <section class="panel">
++    <h2>Why does Apply require review and typed confirmation?</h2>
++    <p>Serial configuration changes can affect a live device immediately. The tool requires a generated preview, explicit review acknowledgement, and a typed <code>APPLY</code> confirmation. It does not automatically run <code>write memory</code> or <code>copy running-config startup-config</code>.</p>
++  </section>
++
++  <section class="panel">
++    <h2>What should I do if a generated command is rejected?</h2>
++    <p>Stop the apply, preserve non-secret command/error evidence, and verify the exact IOS / IOS-XE model and release. Do not force a generic hardening command that the platform parser rejects. Correct or capability-gate the generator before retrying.</p>
++  </section>
++</main>
++</body>
++</html>

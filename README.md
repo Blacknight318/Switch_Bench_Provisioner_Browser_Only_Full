@@ -1,7 +1,10 @@
 # Switch Bench Provisioner — browser-only edition
 
 ## Contents
-- `index.html` — the complete application.
+- `index.html` — main application markup and Content Security Policy.
+- `styles.css` — local application and FAQ styling.
+- `app.js` — local browser-only application logic.
+- `faq.html` — safe-use guidance and links to the sanitized example files.
 - `profile.json` — site-specific non-secret working profile; do not distribute it unchanged.
 - `profile.distribution.example.json` — sanitized distribution profile. Site names, addresses, infrastructure endpoints, and account names use `${VARIABLE}` placeholders resolved from the imported encrypted key file.
 - `.env.example` — complete example key-file format. It contains placeholder site values and no usable secrets.
