@@ -33,17 +33,100 @@
 </main>
 <script>
 'use strict';
-const $=id=>document.getElementById(id); const log=(m,kind='')=>{const el=$('log');el.textContent+=`\n[${new Date().toLocaleTimeString()}] ${m}`;el.scrollTop=el.scrollHeight; if(kind) $('serialStatus').innerHTML=`<span class="${kind}">${m}</span>`};
+const $=id=>document.getElementById(id);
+const log=(m,kind='')=>{
+  const message=String(m);
+  const el=$('log');
+  el.textContent+=`\n[${new Date().toLocaleTimeString()}] ${message}`;
+  el.scrollTop=el.scrollHeight;
+  if(kind){
+    const status=$('serialStatus');
+    const badge=document.createElement('span');
+    badge.className=kind;
+    badge.textContent=message;
+    status.replaceChildren(badge);
+  }
+};
 let ports=[], selected=null, serialPort=null, writer=null, reader=null, readLoop=false, serialText='', serialClosing=false, suppressConsoleOutput=false;
-const defaults=(count)=>{const a=[];for(let n=1;n<=count;n++){let vlan='',desc='OPEN';if(n<=4){vlan='100';desc='VLAN 100';}else if(n<=7){vlan='120';desc='VLAN 120';}else if(n===8){vlan='108';desc='VLAN 108';}a.push({name:`Gi1/0/${n}`,mode:vlan?'access':'unused',vlan,description:desc,admin:vlan?'no shutdown':'shutdown',used:false,includeUsed:false,rootGuard:false,default:true});}a.push({name:'Gi1/1/1',mode:'unused',vlan:'',description:'AUXILIARY UPLINK',admin:'shutdown',used:false,includeUsed:false,default:true});a.push({name:'Gi1/1/2',mode:'unused',vlan:'',description:'AUXILIARY UPLINK',admin:'shutdown',used:false,includeUsed:false,default:true});for(const n of [3,4])a.push({name:`Te1/1/${n}`,mode:'trunk',vlan:'',description:'TRUNK',admin:'no shutdown',used:false,includeUsed:false,default:true});return a};
-function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function render(){const box=$('ports');box.innerHTML='';ports.forEach((p,i)=>{const b=document.createElement('button');b.className=`port ${p.mode==='trunk'?'trunk':''} ${p.mode==='unused'?'unassigned':''} ${p.used?'used':''} ${selected===i?'active':''}`;b.innerHTML=`<span class="name">${esc(p.name)}</span><span class="meta">${p.mode==='access'?'Access VLAN '+esc(p.vlan||'—'):p.mode==='trunk'?'Trunk':'Unassigned'}</span><span class="meta">${esc(p.description||'')}</span>${p.used?'<span class="meta bad">IN USE / protected</span>':''}`;b.onclick=()=>select(i);box.append(b)});updateApply()}
-function select(i){selected=i;const p=ports[i];$('editor').classList.remove('hidden');$('selectedInfo').textContent=`Editing ${p.name}${p.used?' — discovered in use; excluded unless explicitly included.':''}`;$('mode').value=p.mode;$('vlan').value=p.vlan;$('adminState').value=p.admin||'no shutdown';$('description').value=p.description;$('includeUsed').checked=p.includeUsed;$('rootGuard').checked=!!p.rootGuard;render()}
+const defaults=(count)=>{
+  const a=[];
+  for(let n=1;n<=count;n++){
+    let vlan='',desc='OPEN';
+    if(n<=4){vlan='100';desc='VLAN 100';}
+    else if(n<=7){vlan='120';desc='VLAN 120';}
+    else if(n===8){vlan='108';desc='VLAN 108';}
+    a.push({name:`Gi1/0/${n}`,mode:vlan?'access':'unused',vlan,description:desc,admin:vlan?'no shutdown':'shutdown',used:false,includeUsed:false,rootGuard:false,default:true});
+  }
+  a.push({name:'Gi1/1/1',mode:'unused',vlan:'',description:'AUXILIARY UPLINK',admin:'shutdown',used:false,includeUsed:false,rootGuard:false,default:true});
+  a.push({name:'Gi1/1/2',mode:'unused',vlan:'',description:'AUXILIARY UPLINK',admin:'shutdown',used:false,includeUsed:false,rootGuard:false,default:true});
+  for(const n of [3,4])a.push({name:`Te1/1/${n}`,mode:'trunk',vlan:'',description:'TRUNK',admin:'no shutdown',used:false,includeUsed:false,rootGuard:false,default:true});
+  return a;
+};
+function appendPortText(parent,className,text){
+  const span=document.createElement('span');
+  span.className=className;
+  span.textContent=text;
+  parent.append(span);
+}
+function render(){
+  const box=$('ports');
+  box.replaceChildren();
+  ports.forEach((p,i)=>{
+    const b=document.createElement('button');
+    b.className='port';
+    b.classList.toggle('trunk',p.mode==='trunk');
+    b.classList.toggle('unassigned',p.mode==='unused');
+    b.classList.toggle('used',p.used);
+    b.classList.toggle('active',selected===i);
+    appendPortText(b,'name',p.name);
+    appendPortText(b,'meta',p.mode==='access'?`Access VLAN ${p.vlan||'—'}`:p.mode==='trunk'?'Trunk':'Unassigned');
+    appendPortText(b,'meta',p.description||'');
+    if(p.used)appendPortText(b,'meta bad','IN USE / protected');
+    b.onclick=()=>select(i);
+    box.append(b);
+  });
+  updateApply();
+}
+function select(i){
+  selected=i;
+  const p=ports[i];
+  $('editor').classList.remove('hidden');
+  $('selectedInfo').textContent=`Editing ${p.name}${p.used?' — discovered in use; excluded unless explicitly included.':''}`;
+  $('mode').value=p.mode;
+  $('vlan').value=p.vlan;
+  $('adminState').value=p.admin||'no shutdown';
+  $('description').value=p.description;
+  $('includeUsed').checked=p.includeUsed;
+  $('rootGuard').checked=!!p.rootGuard;
+  render();
+}
 function validVlan(v){return /^([1-9]|[1-9]\d{1,3}|[1-3]\d{3}|40[0-8]\d|409[0-4])$/.test(v)&&+v<=4094}
 $('savePort').onclick=()=>{if(selected===null)return;const p=ports[selected], mode=$('mode').value, vlan=$('vlan').value.trim(), admin=$('adminState').value, desc=$('description').value.trim();if(mode==='access'&&!validVlan(vlan)){alert('Enter an access VLAN from 1 through 4094.');return}p.mode=mode;p.vlan=mode==='access'?vlan:'';p.admin=(admin==='shutdown'?'shutdown':'no shutdown');p.description=desc;p.includeUsed=$('includeUsed').checked;p.rootGuard=$('rootGuard').checked;p.default=false;render()};
 $('resetPort').onclick=()=>{if(selected===null)return;const fresh=defaults(+$('portCount').value).find(p=>p.name===ports[selected].name);fresh.used=ports[selected].used;ports[selected]=fresh;select(selected)};
 $('portCount').onchange=()=>{ports=defaults(+$('portCount').value);selected=null;$('editor').classList.add('hidden');$('selectedInfo').textContent='Click a port to edit it.';render();log('Port profile reset to '+$('portCount').value+' access ports.','')};
-function parseUsage(text,source='pasted output'){if(!text.trim()){log(`Port-use parser skipped: no ${source} is available. Run read-only inspection, wait for output, then use Parse captured serial output or paste show interfaces status output.`,'bad');return}let hits=0;for(const p of ports){const long=p.name.replace(/^Gi/,'GigabitEthernet').replace(/^Te/,'TenGigabitEthernet');const re=new RegExp(`(?:^|\\n)\\s*(?:${p.name.replace(/[\/]/g,'\\$&')}|${long.replace(/[\/]/g,'\\$&')})\\s+(.+)$`,'mi');const m=text.match(re);if(m){const state=m[1].toLowerCase();const inUse=/\bconnected\b/.test(state)&&!(/notconnect|disabled|err-disabled/.test(state));p.used=inUse;if(inUse)hits++;}}render();log(`Parsed ${source}: ${hits} currently connected port(s) marked protected.`);}
+function regexEscape(value){
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+}
+function parseUsage(text,source='pasted output'){
+  if(!text.trim()){
+    log(`Port-use parser skipped: no ${source} is available. Run read-only inspection, wait for output, then use Parse captured serial output or paste show interfaces status output.`,'bad');
+    return;
+  }
+  let hits=0;
+  for(const p of ports){
+    const long=p.name.replace(/^Gi/,'GigabitEthernet').replace(/^Te/,'TenGigabitEthernet');
+    const re=new RegExp(`(?:^|\\n)\\s*(?:${regexEscape(p.name)}|${regexEscape(long)})\\s+(.+)$`,'mi');
+    const m=text.match(re);
+    if(m){
+      const state=m[1].toLowerCase();
+      const inUse=/\bconnected\b/.test(state)&&!(/notconnect|disabled|err-disabled/.test(state));
+      p.used=inUse;
+      if(inUse)hits++;
+    }
+  }
+  render();
+  log(`Parsed ${source}: ${hits} currently connected port(s) marked protected.`);
+}
 $('parseStatus').onclick=()=>parseUsage($('statusPaste').value,'pasted status output');
 $('parseCapturedStatus').onclick=()=>parseUsage(serialText,'captured serial output');
 function cleanDesc(s){return s.replace(/[\r\n]/g,' ').replace(/[^\w .,:()\/-]/g,'').slice(0,120)}
