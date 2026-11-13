@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy"
+  content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Switch Bench Provisioner FAQ</title>
+<style>
+:root{color-scheme:dark;--bg:#10151c;--panel:#18212c;--line:#344458;--text:#e8eef6;--muted:#a9b8ca;--blue:#48a6ff;--amber:#ffbf52}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.55 system-ui,sans-serif}header{padding:24px max(20px,calc((100vw - 920px)/2));border-bottom:1px solid var(--line);background:#121b26}main{max-width:920px;margin:auto;padding:24px 20px 48px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;margin:16px 0}h1{margin:0;font-size:1.7rem}h2{font-size:1.12rem;margin:0 0 8px}.sub,.note{color:var(--muted)}a{color:var(--blue)}a:focus-visible{outline:3px solid var(--amber);outline-offset:3px;border-radius:3px}code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;background:#0e151e;padding:1px 4px;border-radius:3px}.warning{border-left:4px solid var(--amber);padding:10px 12px;background:#302719;color:#ffe0a5}li+li{margin-top:7px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Switch Bench Provisioner FAQ</h1>
+  <p class="sub">Browser-only Cisco IOS / IOS-XE bench-provisioning guidance.</p>
+</header>
+<main>
+  <p><a href="index.html">← Return to the provisioner</a></p>
+
+  <section class="panel">
+    <h2>What is this tool for?</h2>
+    <p>It is a bench-only planning and browser-serial provisioning tool for supported Cisco Catalyst IOS / IOS-XE switches. Review generated configuration before applying it, and manually save the switch configuration only after validating the result.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Does the hosted demo upload my profile, key file, serial output, or credentials?</h2>
+    <p>No. The application is static and processes files selected by you in the browser. It has no application API, upload endpoint, analytics request, or server-side serial service. Imported key-file content is encrypted in active-tab memory and is cleared on the documented clear, replacement, disconnect, unload, and inactivity events.</p>
+    <p class="warning">This protects against routine persistence and accidental exposure. Do not import real credentials into a browser or workstation you do not trust, and do not commit a real <code>.env</code> file to Git.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Where do I get the example files?</h2>
+    <ul>
+      <li><a href="https://github.com/Blacknight318/Switch_Bench_Provisioner_Browser_Only_Full/blob/main/.env.example" target="_blank" rel="noopener noreferrer">View .env.example on GitHub</a></li>
+      <li><a href="https://github.com/Blacknight318/Switch_Bench_Provisioner_Browser_Only_Full/blob/main/profile.distribution.example.json" target="_blank" rel="noopener noreferrer">View profile.distribution.example.json on GitHub</a></li>
+    </ul>
+    <p>Copy each example locally. Use a private <code>.env</code> for site values and secrets; keep <code>profile.distribution.example.json</code> as the reusable sanitized template. Do not publish a site-specific profile unless it is reviewed and intentionally sanitized.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Which browser should I use for serial access?</h2>
+    <p>Use Chromium or Microsoft Edge over HTTPS or <code>http://localhost</code>. Web Serial requires you to explicitly choose a serial device; the web page cannot silently open a serial port.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Will the tool update switch firmware?</h2>
+    <p>No. Firmware updates are intentionally out of scope. Image transfer, image integrity, storage capacity, install/bundle mode, boot variables, compatibility, and rollback must be validated for the exact model and release before any write action.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Why does Apply require review and typed confirmation?</h2>
+    <p>Serial configuration changes can affect a live device immediately. The tool requires a generated preview, explicit review acknowledgement, and a typed <code>APPLY</code> confirmation. It does not automatically run <code>write memory</code> or <code>copy running-config startup-config</code>.</p>
+  </section>
+
+  <section class="panel">
+    <h2>What should I do if a generated command is rejected?</h2>
+    <p>Stop the apply, preserve non-secret command/error evidence, and verify the exact IOS / IOS-XE model and release. Do not force a generic hardening command that the platform parser rejects. Correct or capability-gate the generator before retrying.</p>
+  </section>
+</main>
+</body>
+</html>
