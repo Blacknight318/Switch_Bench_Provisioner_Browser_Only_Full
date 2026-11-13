@@ -10,6 +10,10 @@
 - `.env.example` — complete example key-file format. It contains placeholder site values and no usable secrets.
 - `start-local.cmd` — optional Windows static-host launcher; it does not read profiles, keys, or serial data.
 
+## Releases
+
+See [RELEASE.md](RELEASE.md) for the SemVer scheme, release checklist, generated ZIP contents, checksum verification, and tag-triggered GitHub Release workflow.
+
 ## Use
 1. Copy `.env.example` to a private `.env` file and replace every placeholder. Do not upload or commit this file.
 2. For distribution or a new site, start with `profile.distribution.example.json`. Keep `${VARIABLE}` references for all site-specific names, addresses, endpoints, and account names; define the corresponding values in the private `.env` file.

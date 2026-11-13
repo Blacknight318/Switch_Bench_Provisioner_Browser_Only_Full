@@ -1,0 +1,140 @@
+name: Create release package
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Validate and publish release assets
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the tagged release
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version, source structure, and release scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '\r\n' < VERSION)"
+          TAG="${GITHUB_REF_NAME#v}"
+
+          if [[ ! "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-(alpha|beta|rc)\.[1-9][0-9]*)?$ ]]; then
+            echo "VERSION is not an approved SemVer value: $VERSION" >&2
+            exit 1
+          fi
+          if [[ "$TAG" != "$VERSION" ]]; then
+            echo "Tag $GITHUB_REF_NAME must match VERSION $VERSION" >&2
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import subprocess
+          import sys
+
+          tracked = set(subprocess.check_output(["git", "ls-files"], text=True).splitlines())
+          required = {
+              ".env.example", ".gitignore", ".nojekyll", "README.md", "CHANGELOG.md", "RELEASE.md", "VERSION",
+              "index.html", "styles.css", "app.js", "faq.html", "profile.distribution.example.json", "start-local.cmd",
+          }
+          missing = required - tracked
+          if missing:
+              raise SystemExit(f"Required release files are not tracked: {sorted(missing)}")
+
+          forbidden_exact = {".env", "profile.json"}
+          forbidden_suffixes = (".key", ".pem", ".p12", ".pfx", ".cklb", ".zip", ".log")
+          forbidden_prefixes = ("Combined CKLB", "SummaryReport", "XCCDF")
+          forbidden = sorted(
+              p for p in tracked
+              if p in forbidden_exact
+              or p.lower().endswith(forbidden_suffixes)
+              or Path(p).name.startswith(forbidden_prefixes)
+          )
+          if forbidden:
+              raise SystemExit(f"Private or generated files must not be tracked for release: {forbidden}")
+
+          index = Path("index.html").read_text(encoding="utf-8")
+          app = Path("app.js").read_text(encoding="utf-8")
+          faq = Path("faq.html").read_text(encoding="utf-8")
+          for page in (index, faq):
+              if "<style" in page or "style=" in page:
+                  raise SystemExit("Inline CSS found; strict style-src 'self' would not cover it")
+          if "<script" in faq or "<script>" in index:
+              raise SystemExit("Unexpected inline script found")
+          required_index = [
+              '<link rel="stylesheet" href="styles.css">',
+              '<script src="app.js"></script>',
+              "script-src 'self'",
+              "style-src 'self'",
+              "connect-src 'none'",
+              "form-action 'none'",
+          ]
+          for value in required_index:
+              if value not in index:
+                  raise SystemExit(f"Required index security/resource marker missing: {value}")
+          for value in ("fetch(", "XMLHttpRequest", "WebSocket(", "EventSource(", "sendBeacon(", "localStorage", "indexedDB", "document.cookie"):
+              if value in app:
+                  raise SystemExit(f"Unexpected browser persistence or network primitive in app.js: {value}")
+          if "navigator.serial.requestPort" not in app:
+              raise SystemExit("Expected browser Web Serial flow is missing")
+          print("Release scope and strict-CSP validation passed.")
+          PY
+
+      - name: Create clean distribution ZIP and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '\r\n' < VERSION)"
+          ROOT="Switch_Bench_Provisioner_Browser_Only_Full-${VERSION}"
+          ASSET="Switch_Bench_Provisioner_Browser_Only_Full-v${VERSION}.zip"
+          mkdir -p "dist/${ROOT}"
+          files=(
+            .env.example
+            .gitignore
+            .nojekyll
+            CHANGELOG.md
+            README.md
+            RELEASE.md
+            VERSION
+            app.js
+            faq.html
+            index.html
+            profile.distribution.example.json
+            start-local.cmd
+            styles.css
+          )
+          for file in "${files[@]}"; do
+            cp -- "$file" "dist/${ROOT}/${file}"
+          done
+          (
+            cd dist
+            python3 -m zipfile -c "$ASSET" "$ROOT"
+            sha256sum "$ASSET" > "${ASSET}.sha256"
+          )
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '\r\n' < VERSION)"
+          ASSET="dist/Switch_Bench_Provisioner_Browser_Only_Full-v${VERSION}.zip"
+          CHECKSUM="${ASSET}.sha256"
+          prerelease=()
+          if [[ "$VERSION" == *-* ]]; then
+            prerelease=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" "$ASSET" "$CHECKSUM" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            "${prerelease[@]}"
